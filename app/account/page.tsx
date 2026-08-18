@@ -1,11 +1,11 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
 import { User, Mail, Phone, Calendar, LogOut } from "lucide-react";
 
-export default function AccountPage() {
+export default function AccountContent() {
   const [profile, setProfile] = useState<{
     full_name?: string;
     email?: string;
