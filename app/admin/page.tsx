@@ -1,5 +1,6 @@
 "use client";
 
+export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import ProductCard from "@/components/ProductCard";
@@ -77,6 +78,7 @@ const PRESET_COLORS = [
 ];
 
 export default function AdminPage() {
+  const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [loading, setLoading] = useState(true);
@@ -118,6 +120,10 @@ export default function AdminPage() {
     if (data) setProducts(data);
     setLoading(false);
   };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -260,7 +266,9 @@ export default function AdminPage() {
       fetchProducts();
     }
   };
-
+  if (!mounted) {
+    return <div className="p-8 text-center">Loading admin panel..</div>;
+  }
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
