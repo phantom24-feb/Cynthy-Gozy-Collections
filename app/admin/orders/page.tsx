@@ -117,8 +117,12 @@ export default function AdminOrdersPage() {
 
                 <div className="mt-3 border-t border-slate-100 pt-3 space-y-1">
                   {order.items.map((item, index) => (
-                    <p key={`${order.id}-${index}`} className="text-xs text-slate-600">
-                      {item.quantity} x {item.name} - ₦{Number(item.price).toLocaleString()}
+                    <p
+                      key={`${order.id}-${index}`}
+                      className="text-xs text-slate-600"
+                    >
+                      {item.quantity} x {item.name} - ₦
+                      {Number(item.price).toLocaleString()}
                     </p>
                   ))}
                 </div>
