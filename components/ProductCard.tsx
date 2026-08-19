@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Check, ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -13,10 +13,31 @@ export interface Product {
   category: string;
   gender?: "Male" | "Female" | "Unisex" | string;
   trending?: boolean;
-  image_url: string;
+  image_url: string | string[];
   stock?: number;
-  sizes?: string;
-  colors?: string;
+  sizes?: string | string[];
+  colors?: string | string[];
+}
+
+function parseImageList(value?: string | string[]) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return [];
+
+  try {
+    const parsedValue: unknown = JSON.parse(trimmedValue);
+    if (Array.isArray(parsedValue)) {
+      return parsedValue.filter(
+        (item): item is string => typeof item === "string" && item.length > 0,
+      );
+    }
+  } catch {
+    // Keep supporting existing single-image URLs.
+  }
+
+  return [trimmedValue];
 }
 
 interface ProductCardProps {
@@ -59,6 +80,7 @@ export default function ProductCard({
 }: ProductCardProps) {
   const sizeList = parseVariantList(product.sizes);
   const colorList = parseVariantList(product.colors);
+  const imageList = parseImageList(product.image_url);
 
   const [selectedSize, setSelectedSize] = useState<string>(sizeList[0] || "");
   const [selectedColor, setSelectedColor] = useState<string>(
@@ -66,10 +88,40 @@ export default function ProductCard({
   );
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  const [activeImage, setActiveImage] = useState(0);
   const imageRef = useRef<HTMLImageElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const suppressClick = useRef(false);
 
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+
+  useEffect(() => {
+    if (imageList.length < 2) return;
+    const interval = window.setInterval(() => {
+      setActiveImage((current) => (current + 1) % imageList.length);
+    }, 3500);
+    return () => window.clearInterval(interval);
+  }, [imageList.length]);
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+    suppressClick.current = false;
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartX.current === null || imageList.length < 2) return;
+    const distance = event.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(distance) < 35) return;
+
+    suppressClick.current = true;
+    setActiveImage((current) =>
+      distance < 0
+        ? (current + 1) % imageList.length
+        : (current - 1 + imageList.length) % imageList.length,
+    );
+    touchStartX.current = null;
+  };
 
   const animateCartAdd = () => {
     const image = imageRef.current;
@@ -181,7 +233,10 @@ export default function ProductCard({
 
   return (
     <div
-      onClick={onSelect}
+      onClick={() => {
+        if (!suppressClick.current) onSelect?.();
+        suppressClick.current = false;
+      }}
       className={`bg-white rounded-2xl p-3 border border-slate-100 shadow-sm hover:shadow-md transition flex flex-col justify-between ${
         onSelect ? "cursor-pointer" : ""
       }`}
@@ -190,11 +245,13 @@ export default function ProductCard({
         <div
           className={`group w-full rounded-xl overflow-hidden mb-2 relative ${
             compact ? "h-32 sm:h-44 bg-slate-100" : "h-64 sm:h-80 bg-white"
-          }`}
+          } touch-pan-y`}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           <img
             ref={imageRef}
-            src={product.image_url}
+            src={imageList[activeImage] || imageList[0] || ""}
             alt={product.name}
             className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${
               compact ? "object-cover" : "object-contain"
@@ -208,6 +265,24 @@ export default function ProductCard({
               {product.gender}
             </span>
           )}
+          {imageList.length > 1 && (
+            <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
+              {imageList.map((image, index) => (
+                <button
+                  key={`${image}-${index}`}
+                  type="button"
+                  aria-label={`Show image ${index + 1}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setActiveImage(index);
+                  }}
+                  className={`h-1.5 rounded-full transition-all ${
+                    index === activeImage ? "w-4 bg-white" : "w-1.5 bg-white/60"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <h3 className="text-xs font-bold text-slate-800 line-clamp-1">
@@ -216,6 +291,14 @@ export default function ProductCard({
         <p className="text-xs font-extrabold text-blue-600 mt-0.5">
           ₦{Number(product.price).toLocaleString()}
         </p>
+
+        {compact && (sizeList.length > 0 || colorList.length > 0) && (
+          <p className="text-[10px] text-slate-500 mt-2 line-clamp-2">
+            {sizeList.length > 0 && `Sizes: ${sizeList.join(", ")}`}
+            {sizeList.length > 0 && colorList.length > 0 && " | "}
+            {colorList.length > 0 && `Colors: ${colorList.join(", ")}`}
+          </p>
+        )}
 
         {!compact && (sizeList.length > 0 || colorList.length > 0) && (
           <div className="grid grid-cols-2 gap-3 mt-3">

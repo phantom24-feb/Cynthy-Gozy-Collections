@@ -24,9 +24,9 @@ interface Product {
   category: string;
   gender?: "Male" | "Female" | "Unisex" | string;
   trending?: boolean;
-  image_url: string;
-  sizes?: string;
-  colors?: string;
+  image_url: string | string[];
+  sizes?: string | string[];
+  colors?: string | string[];
 }
 
 const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelries"];
@@ -57,6 +57,52 @@ function parseVariantValues(value?: string | string[]) {
     .split(",")
     .map((item) => item.trim().replace(/^"|"$/g, ""))
     .filter(Boolean);
+}
+
+function parseImageValues(value?: string | string[]) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  try {
+    const parsedValue: unknown = JSON.parse(value);
+    if (Array.isArray(parsedValue)) {
+      return parsedValue.filter(
+        (item): item is string => typeof item === "string" && item.length > 0,
+      );
+    }
+  } catch {
+    // Existing products may still contain one plain image URL.
+  }
+  return [value];
+}
+
+async function compressImage(file: File) {
+  const bitmap = await createImageBitmap(file);
+  const maxDimension = 1600;
+  const scale = Math.min(
+    1,
+    maxDimension / Math.max(bitmap.width, bitmap.height),
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    bitmap.close();
+    return file;
+  }
+
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.82),
+  );
+  return blob
+    ? new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, {
+        type: "image/jpeg",
+      })
+    : file;
 }
 
 const PRESET_SIZES = [
@@ -127,8 +173,8 @@ export default function AdminPage() {
   const [gender, setGender] = useState("Unisex");
 
   // Image upload states
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -176,8 +222,8 @@ export default function AdminPage() {
     setPrice("");
     setCategory("Clothes");
     setGender("Unisex");
-    setImageFile(null);
-    setPreviewUrl("");
+    setImageFiles([]);
+    setPreviewUrls([]);
     setSelectedSizes([]);
     setSelectedColors([]);
     setIsModalOpen(true);
@@ -190,19 +236,22 @@ export default function AdminPage() {
     setPrice(product.price.toString());
     setCategory(product.category);
     setGender(product.gender || "Unisex");
-    setImageFile(null);
-    setPreviewUrl(product.image_url);
+    setImageFiles([]);
+    setPreviewUrls(parseImageValues(product.image_url));
     setSelectedSizes(parseVariantValues(product.sizes));
     setSelectedColors(parseVariantValues(product.colors));
     setIsModalOpen(true);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setImageFiles((current) => [...current, ...files]);
+    setPreviewUrls((current) => [
+      ...current,
+      ...files.map((file) => URL.createObjectURL(file)),
+    ]);
+    e.target.value = "";
   };
 
   const addSize = (val: string) => {
@@ -223,28 +272,34 @@ export default function AdminPage() {
     e.preventDefault();
     setUploading(true);
 
-    let finalImageUrl = previewUrl;
+    let imageUrls = previewUrls;
 
     // Upload selected gallery file to Supabase Storage
-    if (imageFile) {
-      const fileExt = imageFile.name.split(".").pop();
-      const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+    if (imageFiles.length > 0) {
+      const uploadedUrls: string[] = [];
+      for (const imageFile of imageFiles) {
+        const compressedImage = await compressImage(imageFile);
+        const fileExt = compressedImage.name.split(".").pop();
+        const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("products")
-        .upload(fileName, imageFile);
+        const { error: uploadError } = await supabase.storage
+          .from("products")
+          .upload(fileName, compressedImage, {
+            contentType: compressedImage.type,
+          });
 
-      if (uploadError) {
-        showToast("Image upload failed: " + uploadError.message, "error");
-        setUploading(false);
-        return;
+        if (uploadError) {
+          showToast("Image upload failed: " + uploadError.message, "error");
+          setUploading(false);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("products")
+          .getPublicUrl(fileName);
+        uploadedUrls.push(publicUrlData.publicUrl);
       }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("products")
-        .getPublicUrl(fileName);
-
-      finalImageUrl = publicUrlData.publicUrl;
+      imageUrls = uploadedUrls;
     }
 
     const payload = {
@@ -253,7 +308,7 @@ export default function AdminPage() {
       price: parseFloat(price) || "",
       category: category || "Clothes",
       gender: gender || "Unisex",
-      image_url: finalImageUrl || "",
+      image_url: JSON.stringify(imageUrls),
       sizes: selectedSizes.join(","),
       colors: selectedColors.join(","),
     };
@@ -424,7 +479,12 @@ export default function AdminPage() {
               >
                 <div className="relative h-48 bg-slate-100">
                   <img
-                    src={product.image_url}
+                    src={
+                      parseImageValues(product.image_url)[0] ||
+                      (typeof product.image_url === "string"
+                        ? product.image_url
+                        : "")
+                    }
                     alt={product.name}
                     className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
                   />
@@ -591,12 +651,17 @@ export default function AdminPage() {
                   Product Photo
                 </label>
                 <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition relative overflow-hidden">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Preview"
-                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                    />
+                  {previewUrls.length > 0 ? (
+                    <div className="grid h-full w-full grid-cols-3 gap-1 p-1">
+                      {previewUrls.map((url, index) => (
+                        <img
+                          key={`${url}-${index}`}
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
+                        />
+                      ))}
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-400">
                       <Upload className="w-6 h-6 mb-1 text-slate-400" />
@@ -608,6 +673,7 @@ export default function AdminPage() {
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleImageChange}
                     className="hidden"
                   />
