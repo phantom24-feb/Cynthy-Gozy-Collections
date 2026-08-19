@@ -164,12 +164,18 @@ export default function ProductCard({
       }`}
     >
       <div>
-        <div className="group h-32 sm:h-44 w-full rounded-xl overflow-hidden mb-2 relative">
+        <div
+          className={`group w-full rounded-xl overflow-hidden mb-2 relative ${
+            compact ? "h-32 sm:h-44 bg-slate-100" : "h-64 sm:h-80 bg-white"
+          }`}
+        >
           <img
             ref={imageRef}
             src={product.image_url}
             alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${
+              compact ? "object-cover" : "object-contain"
+            }`}
           />
           <span className="absolute top-2 left-2 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
             {product.category}

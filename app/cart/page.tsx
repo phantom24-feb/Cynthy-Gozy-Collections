@@ -24,10 +24,19 @@ interface CartItem {
   };
 }
 
+interface Order {
+  id: string;
+  total: number;
+  status: "processing" | "confirmed";
+  created_at: string;
+}
+
 export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [orderStatus, setOrderStatus] = useState<"processing" | "confirmed" | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
   const fetchCart = useCallback(async () => {
@@ -46,6 +55,15 @@ export default function CartPage() {
       if (data) {
         setCartItems(data as unknown as CartItem[]);
       }
+
+      const { data: orderHistory } = await supabase
+        .from("orders")
+        .select("id, total, status, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      const typedOrders = (orderHistory || []) as Order[];
+      setOrders(typedOrders);
+      setOrderStatus(typedOrders[0]?.status || null);
     }
     setLoading(false);
   }, [supabase]);
@@ -76,11 +94,16 @@ export default function CartPage() {
     0,
   );
 
-  const handleWhatsAppCheckout = () => {
+  const handleWhatsAppCheckout = async () => {
     const whatsappNumber = (
       process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ""
     ).replace(/\D/g, "");
     if (!whatsappNumber || cartItems.length === 0) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
     let message = `*New Order - Cynthy Gozy Collections*\n`;
     message += `*Customer:* ${userName}\n`;
@@ -95,11 +118,40 @@ export default function CartPage() {
     message += `*Total Amount:* ₦${subtotal.toLocaleString()}\n\n`;
     message += `Please confirm my order details!`;
 
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        user_id: user.id,
+        customer_name: userName,
+        total: subtotal,
+        items: cartItems.map((item) => ({
+          product_id: item.products.id,
+          name: item.products.name,
+          quantity: item.quantity,
+          price: item.products.price,
+        })),
+        status: "processing",
+      })
+      .select("id, total, status, created_at")
+      .single();
+
+    if (orderError || !order) return;
+
+    const { error: clearCartError } = await supabase
+      .from("cart_items")
+      .delete()
+      .eq("user_id", user.id);
+    if (clearCartError) return;
+
+    setCartItems([]);
+    setOrders((current) => [order as Order, ...current]);
+
     const encodedMessage = encodeURIComponent(message);
     window.open(
       `https://wa.me/${whatsappNumber}?text=${encodedMessage}`,
       "_blank",
     );
+    setOrderStatus("processing");
   };
 
   return (
@@ -210,13 +262,59 @@ export default function CartPage() {
 
               <button
                 onClick={handleWhatsAppCheckout}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition"
+                disabled={orderStatus === "processing"}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-70"
               >
-                <MessageSquareCode className="w-4 h-4" /> Order via WhatsApp
+                <MessageSquareCode className="w-4 h-4" />
+                {orderStatus === "confirmed"
+                  ? "Order Confirmed"
+                  : orderStatus === "processing"
+                    ? "Order Processing"
+                    : "Order via WhatsApp"}
               </button>
             </div>
           </div>
         )}
+        <section className="space-y-3">
+          <h2 className="text-lg font-extrabold text-slate-900">Your Orders</h2>
+          {orders.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center text-sm text-slate-500">
+              You have not placed any orders yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {orders.map((order) => (
+                <article
+                  key={order.id}
+                  className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">
+                      Order #{order.id.slice(0, 8)}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {new Date(order.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-extrabold text-blue-600">
+                      ₦{Number(order.total).toLocaleString()}
+                    </p>
+                    <p
+                      className={`text-[10px] font-bold uppercase mt-1 ${
+                        order.status === "confirmed"
+                          ? "text-emerald-600"
+                          : "text-amber-600"
+                      }`}
+                    >
+                      {order.status}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

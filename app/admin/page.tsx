@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -335,6 +336,12 @@ export default function AdminPage() {
             <Plus className="w-4 h-4" />
             Add Product
           </button>
+          <Link
+            href="/admin/orders"
+            className="inline-flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold"
+          >
+            Orders
+          </Link>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
