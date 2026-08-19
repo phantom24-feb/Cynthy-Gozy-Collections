@@ -25,17 +25,40 @@ interface ProductCardProps {
   onSelect?: () => void;
 }
 
+function parseVariantList(value?: string | string[]) {
+  if (!value) return [];
+  if (Array.isArray(value))
+    return value.map((item) => item.trim()).filter(Boolean);
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return [];
+
+  try {
+    const parsedValue: unknown = JSON.parse(trimmedValue);
+    if (Array.isArray(parsedValue)) {
+      return parsedValue
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  } catch {
+    // Fall through to support comma-separated and Postgres array text.
+  }
+
+  return trimmedValue
+    .replace(/^\{(.*)\}$/, "$1")
+    .split(",")
+    .map((item) => item.trim().replace(/^"|"$/g, ""))
+    .filter(Boolean);
+}
+
 export default function ProductCard({
   product,
   compact = false,
   onSelect,
 }: ProductCardProps) {
-  const sizeList = product.sizes
-    ? product.sizes.split(",").filter(Boolean)
-    : [];
-  const colorList = product.colors
-    ? product.colors.split(",").filter(Boolean)
-    : [];
+  const sizeList = parseVariantList(product.sizes);
+  const colorList = parseVariantList(product.colors);
 
   const [selectedSize, setSelectedSize] = useState<string>(sizeList[0] || "");
   const [selectedColor, setSelectedColor] = useState<string>(

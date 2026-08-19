@@ -32,6 +32,33 @@ interface Product {
 const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelries"];
 const GENDERS = ["Male", "Female", "Unisex"];
 
+function parseVariantValues(value?: string | string[]) {
+  if (!value) return [];
+  if (Array.isArray(value))
+    return value.map((item) => item.trim()).filter(Boolean);
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return [];
+
+  try {
+    const parsedValue: unknown = JSON.parse(trimmedValue);
+    if (Array.isArray(parsedValue)) {
+      return parsedValue
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  } catch {
+    // Fall through to support comma-separated and Postgres array text.
+  }
+
+  return trimmedValue
+    .replace(/^\{(.*)\}$/, "$1")
+    .split(",")
+    .map((item) => item.trim().replace(/^"|"$/g, ""))
+    .filter(Boolean);
+}
+
 const PRESET_SIZES = [
   "XS",
   "S",
@@ -165,12 +192,8 @@ export default function AdminPage() {
     setGender(product.gender || "Unisex");
     setImageFile(null);
     setPreviewUrl(product.image_url);
-    setSelectedSizes(
-      product.sizes ? product.sizes.split(",").filter(Boolean) : [],
-    );
-    setSelectedColors(
-      product.colors ? product.colors.split(",").filter(Boolean) : [],
-    );
+    setSelectedSizes(parseVariantValues(product.sizes));
+    setSelectedColors(parseVariantValues(product.colors));
     setIsModalOpen(true);
   };
 
@@ -231,8 +254,8 @@ export default function AdminPage() {
       category: category || "Clothes",
       gender: gender || "Unisex",
       image_url: finalImageUrl || "",
-      sizes: selectedSizes,
-      colors: selectedColors,
+      sizes: selectedSizes.join(","),
+      colors: selectedColors.join(","),
     };
 
     let result;

@@ -39,7 +39,9 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
-  const [orderStatus, setOrderStatus] = useState<"processing" | "confirmed" | null>(null);
+  const [orderStatus, setOrderStatus] = useState<
+    "processing" | "confirmed" | null
+  >(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const supabase = useMemo(() => createClient(), []);
