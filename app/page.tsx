@@ -130,7 +130,9 @@ export default function HomePage() {
     fetchProducts();
   }, [selectedCategory, searchQuery, supabase]);
 
-  const trendingProducts = products.filter((product) => product.trending).slice(0, 11);
+  const trendingProducts = products
+    .filter((product) => product.trending)
+    .slice(0, 11);
   const productRows = Array.from(
     { length: Math.ceil(products.length / 11) },
     (_, index) => products.slice(index * 11, index * 11 + 11),

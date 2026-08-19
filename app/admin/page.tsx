@@ -87,7 +87,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [openMenuProductId, setOpenMenuProductId] = useState<string | null>(null);
+  const [openMenuProductId, setOpenMenuProductId] = useState<string | null>(
+    null,
+  );
 
   // Form State
   const [name, setName] = useState("");
@@ -287,7 +289,9 @@ export default function AdminPage() {
     );
     setOpenMenuProductId(null);
     showToast(
-      nextTrending ? "Product added to Trending." : "Product removed from Trending.",
+      nextTrending
+        ? "Product added to Trending."
+        : "Product removed from Trending.",
       "success",
     );
   };
