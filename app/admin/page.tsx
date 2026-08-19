@@ -328,20 +328,22 @@ export default function AdminPage() {
             </h1>
           </div>
 
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm hover:bg-blue-700 transition"
-          >
-            <Plus className="w-4 h-4" />
-            Add Product
-          </button>
-          <Link
-            href="/admin/orders"
-            className="inline-flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold"
-          >
-            Orders
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm hover:bg-blue-700 transition"
+            >
+              <Plus className="w-4 h-4" />
+              Add Product
+            </button>
+            <Link
+              href="/admin/orders"
+              className="inline-flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold"
+            >
+              Orders
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">

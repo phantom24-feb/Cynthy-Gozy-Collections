@@ -67,7 +67,7 @@ export default function CartPage() {
         .order("created_at", { ascending: false });
       const typedOrders = (orderHistory || []) as Order[];
       setOrders(typedOrders);
-      setOrderStatus(typedOrders[0]?.status || null);
+      setOrderStatus(null);
     }
     setLoading(false);
   }, [supabase]);
@@ -170,7 +170,7 @@ export default function CartPage() {
       setOrders((current) => [order as Order, ...current]);
 
       const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodedMessage}`;
       if (whatsappWindow) {
         whatsappWindow.location.href = whatsappUrl;
       } else {
