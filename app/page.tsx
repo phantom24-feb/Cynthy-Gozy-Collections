@@ -5,7 +5,7 @@ import Navbar from "@/components/Navbar";
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/components/ProductCard";
 import { createClient } from "@/lib/supabase/client";
-import { Sparkles, Flame, Layers } from "lucide-react";
+import { Sparkles, Flame } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
 const CATEGORIES = ["All", "Men", "Women", "Clothes", "Shoes", "Jewelries"];

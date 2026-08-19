@@ -32,6 +32,8 @@ interface Order {
   created_at: string;
 }
 
+const DEFAULT_WHATSAPP_NUMBER = "2348147850652";
+
 export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +104,7 @@ export default function CartPage() {
     if (checkoutLoading) return;
 
     const whatsappNumber = (
-      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ""
+      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || DEFAULT_WHATSAPP_NUMBER
     ).replace(/\D/g, "");
     if (!whatsappNumber) {
       setCheckoutError("WhatsApp is not configured for this store.");
@@ -174,7 +176,7 @@ export default function CartPage() {
       if (whatsappWindow) {
         whatsappWindow.location.href = whatsappUrl;
       } else {
-        window.location.href = whatsappUrl;
+        window.open(whatsappUrl, "_self");
       }
       setOrderStatus("processing");
     } catch (error) {

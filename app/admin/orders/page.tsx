@@ -38,7 +38,7 @@ export default function AdminOrdersPage() {
   }, [supabase]);
 
   useEffect(() => {
-    void fetchOrders();
+    queueMicrotask(() => void fetchOrders());
   }, [fetchOrders]);
 
   const confirmOrder = async (orderId: string) => {
