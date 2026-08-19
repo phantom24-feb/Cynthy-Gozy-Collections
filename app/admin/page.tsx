@@ -1,9 +1,8 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
-import ProductCard from "@/components/ProductCard";
 import { createClient } from "@/lib/supabase/client";
 import {
   Plus,
@@ -13,6 +12,7 @@ import {
   X,
   Image as ImageIcon,
   Upload,
+  MoreVertical,
 } from "lucide-react";
 
 interface Product {
@@ -21,12 +21,15 @@ interface Product {
   description: string;
   price: number;
   category: string;
+  gender?: "Male" | "Female" | "Unisex" | string;
+  trending?: boolean;
   image_url: string;
   sizes?: string;
   colors?: string;
 }
 
-const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelry"];
+const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelries"];
+const GENDERS = ["Male", "Female", "Unisex"];
 
 const PRESET_SIZES = [
   "XS",
@@ -78,23 +81,29 @@ const PRESET_COLORS = [
 ];
 
 export default function AdminPage() {
-  const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [inventorySearch, setInventorySearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [openMenuProductId, setOpenMenuProductId] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Clothes");
+  const [gender, setGender] = useState("Unisex");
 
   // Image upload states
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
   // Variant States
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
@@ -103,9 +112,14 @@ export default function AdminPage() {
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [customColorInput, setCustomColorInput] = useState("");
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const fetchProducts = async () => {
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ message, type });
+    window.setTimeout(() => setToast(null), 5000);
+  };
+
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     let query = supabase
       .from("products")
@@ -119,15 +133,11 @@ export default function AdminPage() {
     const { data } = await query;
     if (data) setProducts(data);
     setLoading(false);
-  };
+  }, [selectedCategory, supabase]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [selectedCategory]);
+    queueMicrotask(() => void fetchProducts());
+  }, [fetchProducts]);
 
   const openCreateModal = () => {
     setEditingProduct(null);
@@ -135,6 +145,7 @@ export default function AdminPage() {
     setDescription("");
     setPrice("");
     setCategory("Clothes");
+    setGender("Unisex");
     setImageFile(null);
     setPreviewUrl("");
     setSelectedSizes([]);
@@ -148,6 +159,7 @@ export default function AdminPage() {
     setDescription(product.description || "");
     setPrice(product.price.toString());
     setCategory(product.category);
+    setGender(product.gender || "Unisex");
     setImageFile(null);
     setPreviewUrl(product.image_url);
     setSelectedSizes(
@@ -197,7 +209,7 @@ export default function AdminPage() {
         .upload(fileName, imageFile);
 
       if (uploadError) {
-        alert("Image upload failed: " + uploadError.message);
+        showToast("Image upload failed: " + uploadError.message, "error");
         setUploading(false);
         return;
       }
@@ -214,6 +226,7 @@ export default function AdminPage() {
       description: description || "",
       price: parseFloat(price) || "",
       category: category || "Clothes",
+      gender: gender || "Unisex",
       image_url: finalImageUrl || "",
       sizes: selectedSizes,
       colors: selectedColors,
@@ -230,27 +243,15 @@ export default function AdminPage() {
     }
 
     if (result.error) {
-      alert("Failed to save product: " + result.error.message);
+      showToast("Failed to save product: " + result.error.message, "error");
       setUploading(false);
       return;
     }
-    alert("Product saved successfully!");
-    setUploading(false);
-    setIsModalOpen(false);
-    window.location.reload();
-
+    showToast("Product saved successfully!", "success");
     setUploading(false);
     setIsModalOpen(false);
     setEditingProduct(null);
-    setName("");
-    setDescription("");
-    setPrice("");
-    setCategory("Clothes");
-    setImageFile(null);
-    setPreviewUrl("");
-    setSelectedSizes([]);
-    setSelectedColors([]);
-    fetchProducts();
+    await fetchProducts();
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -266,14 +267,51 @@ export default function AdminPage() {
       fetchProducts();
     }
   };
-  if (!mounted) {
-    return <div className="p-8 text-center">Loading admin panel..</div>;
-  }
+
+  const toggleTrending = async (product: Product) => {
+    const nextTrending = !product.trending;
+    const { error } = await supabase
+      .from("products")
+      .update({ trending: nextTrending })
+      .eq("id", product.id);
+
+    if (error) {
+      showToast("Unable to update trending status: " + error.message, "error");
+      return;
+    }
+
+    setProducts((current) =>
+      current.map((item) =>
+        item.id === product.id ? { ...item, trending: nextTrending } : item,
+      ),
+    );
+    setOpenMenuProductId(null);
+    showToast(
+      nextTrending ? "Product added to Trending." : "Product removed from Trending.",
+      "success",
+    );
+  };
+  const visibleProducts = products.filter((product) =>
+    product.name.toLowerCase().includes(inventorySearch.trim().toLowerCase()),
+  );
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navbar />
+      <Navbar showSearch={false} />
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      {toast && (
+        <div
+          role="status"
+          className={`fixed top-20 right-4 z-[60] max-w-sm rounded-xl px-4 py-3 text-xs font-semibold shadow-lg ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.18em]">
@@ -312,6 +350,16 @@ export default function AdminPage() {
           ))}
         </div>
 
+        <div className="mb-6 max-w-md">
+          <input
+            type="search"
+            value={inventorySearch}
+            onChange={(event) => setInventorySearch(event.target.value)}
+            placeholder="Search inventory..."
+            className="w-full px-3 py-2.5 text-xs text-slate-900 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             {[...Array(8)].map((_, index) => (
@@ -321,7 +369,7 @@ export default function AdminPage() {
               />
             ))}
           </div>
-        ) : products.length === 0 ? (
+        ) : visibleProducts.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
             <ImageIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-slate-700">
@@ -333,7 +381,7 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            {products.map((product) => (
+            {visibleProducts.map((product) => (
               <div
                 key={product.id}
                 className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
@@ -342,8 +390,33 @@ export default function AdminPage() {
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
                   />
+                  <button
+                    type="button"
+                    aria-label="Product actions"
+                    onClick={() =>
+                      setOpenMenuProductId(
+                        openMenuProductId === product.id ? null : product.id,
+                      )
+                    }
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 text-slate-700 shadow-sm"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                  {openMenuProductId === product.id && (
+                    <div className="absolute top-11 right-2 z-10 w-44 rounded-xl bg-white border border-slate-200 shadow-lg p-1">
+                      <button
+                        type="button"
+                        onClick={() => void toggleTrending(product)}
+                        className="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        {product.trending
+                          ? "Remove from Trending"
+                          : "Add to Trending"}
+                      </button>
+                    </div>
+                  )}
                   <span className="absolute top-2 left-2 bg-slate-900/75 text-white text-[10px] font-bold px-2 py-1 rounded-full">
                     {product.category}
                   </span>
@@ -425,7 +498,7 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Category
@@ -438,6 +511,23 @@ export default function AdminPage() {
                     {CATEGORIES.filter((cat) => cat !== "All").map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Gender
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs text-slate-900 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    {GENDERS.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
                       </option>
                     ))}
                   </select>
@@ -469,7 +559,7 @@ export default function AdminPage() {
                     <img
                       src={previewUrl}
                       alt="Preview"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-400">

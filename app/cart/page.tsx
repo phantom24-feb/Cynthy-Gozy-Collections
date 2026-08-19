@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -28,9 +28,9 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     setLoading(true);
     const {
       data: { user },
@@ -48,11 +48,11 @@ export default function CartPage() {
       }
     }
     setLoading(false);
-  };
+  }, [supabase]);
 
   useEffect(() => {
-    fetchCart();
-  }, []);
+    queueMicrotask(() => void fetchCart());
+  }, [fetchCart]);
 
   const updateQuantity = async (
     id: string,
@@ -77,7 +77,10 @@ export default function CartPage() {
   );
 
   const handleWhatsAppCheckout = () => {
-    const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
+    const whatsappNumber = (
+      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ""
+    ).replace(/\D/g, "");
+    if (!whatsappNumber || cartItems.length === 0) return;
 
     let message = `*New Order - Cynthy Gozy Collections*\n`;
     message += `*Customer:* ${userName}\n`;
@@ -101,9 +104,9 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar />
+      <Navbar showSearch={false} />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-6">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 flex-1 w-full space-y-6">
         <h1 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
           <ShoppingBag className="w-5 h-5 text-blue-600" /> Your Shopping Cart
         </h1>
@@ -140,11 +143,13 @@ export default function CartPage() {
                   className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center space-x-3">
-                    <img
-                      src={item.products.image_url}
-                      alt={item.products.name}
-                      className="w-16 h-16 object-cover rounded-xl bg-slate-50"
-                    />
+                    <div className="w-16 h-16 rounded-xl bg-slate-50 overflow-hidden">
+                      <img
+                        src={item.products.image_url}
+                        alt={item.products.name}
+                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                      />
+                    </div>
                     <div>
                       <h4 className="text-xs font-bold text-slate-900 line-clamp-1">
                         {item.products.name}

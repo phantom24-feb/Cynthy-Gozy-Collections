@@ -1,30 +1,102 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "@/components/Navbar";
 import ProductCard from "@/components/ProductCard";
+import type { Product } from "@/components/ProductCard";
 import { createClient } from "@/lib/supabase/client";
-import { Sparkles, Flame, ChevronRight, Layers } from "lucide-react";
+import { Sparkles, Flame, Layers } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  image_url: string;
-  stock: number;
-}
+const CATEGORIES = ["All", "Men", "Women", "Clothes", "Shoes", "Jewelries"];
 
-const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelry"];
+function ProductCarouselRow({
+  products,
+  onSelect,
+  hideLastOnMobile = false,
+}: {
+  products: Product[];
+  onSelect: (product: Product) => void;
+  hideLastOnMobile?: boolean;
+}) {
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+
+    let isInteracting = false;
+    let interactionTimeout: number | undefined;
+    const pauseForInteraction = () => {
+      isInteracting = true;
+      if (interactionTimeout) window.clearTimeout(interactionTimeout);
+      interactionTimeout = window.setTimeout(() => {
+        isInteracting = false;
+      }, 2500);
+    };
+
+    carousel.addEventListener("pointerdown", pauseForInteraction);
+    carousel.addEventListener("touchstart", pauseForInteraction, {
+      passive: true,
+    });
+    carousel.addEventListener("wheel", pauseForInteraction, { passive: true });
+    carousel.addEventListener("scroll", pauseForInteraction, { passive: true });
+
+    const interval = window.setInterval(() => {
+      if (isInteracting || carousel.scrollWidth <= carousel.clientWidth + 8) {
+        return;
+      }
+
+      const firstCard = carousel.firstElementChild as HTMLElement | null;
+      const scrollAmount = firstCard
+        ? firstCard.offsetWidth + 8
+        : carousel.clientWidth * 0.8;
+      const atEnd =
+        carousel.scrollLeft + carousel.clientWidth >= carousel.scrollWidth - 8;
+
+      carousel.scrollTo({
+        left: atEnd ? 0 : carousel.scrollLeft + scrollAmount,
+        behavior: "smooth",
+      });
+    }, 3500);
+
+    return () => {
+      window.clearInterval(interval);
+      if (interactionTimeout) window.clearTimeout(interactionTimeout);
+      carousel.removeEventListener("pointerdown", pauseForInteraction);
+      carousel.removeEventListener("touchstart", pauseForInteraction);
+      carousel.removeEventListener("wheel", pauseForInteraction);
+      carousel.removeEventListener("scroll", pauseForInteraction);
+    };
+  }, [products]);
+
+  return (
+    <div
+      ref={carouselRef}
+      className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-none px-1 pb-2 sm:gap-3 sm:px-0"
+    >
+      {products.map((product) => (
+        <div
+          key={product.id}
+          className={`${hideLastOnMobile && products.length === 11 && product === products[10] ? "hidden sm:block" : ""} min-w-[46vw] snap-start sm:min-w-[220px]`}
+        >
+          <ProductCard
+            product={product}
+            compact
+            onSelect={() => onSelect(product)}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("search") || "";
   useEffect(() => {
@@ -35,7 +107,11 @@ export default function HomePage() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (selectedCategory !== "All") {
+      if (selectedCategory === "Men") {
+        query = query.eq("gender", "Male");
+      } else if (selectedCategory === "Women") {
+        query = query.eq("gender", "Female");
+      } else if (selectedCategory !== "All") {
         query = query.eq("category", selectedCategory);
       }
 
@@ -52,28 +128,13 @@ export default function HomePage() {
     };
 
     fetchProducts();
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, supabase]);
 
-  // Auto-scroll mechanism for horizontal feature carousel
-  useEffect(() => {
-    const carousel = carouselRef.current;
-    if (!carousel) return;
-
-    const interval = setInterval(() => {
-      if (
-        carousel.scrollLeft + carousel.clientWidth >=
-        carousel.scrollWidth - 10
-      ) {
-        carousel.scrollTo({ left: 0, behavior: "smooth" });
-      } else {
-        carousel.scrollBy({ left: 240, behavior: "smooth" });
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [products]);
-
-  const trendingProducts = products.slice(0, 6);
+  const trendingProducts = products.filter((product) => product.trending).slice(0, 11);
+  const productRows = Array.from(
+    { length: Math.ceil(products.length / 11) },
+    (_, index) => products.slice(index * 11, index * 11 + 11),
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -90,55 +151,12 @@ export default function HomePage() {
             Cynthy Gozy Collections
           </h1>
           <p className="text-xs text-blue-100 max-w-md mx-auto">
-            Browse Clothes, Shoes & Jewelry. Sign up to add to cart and order
-            directly via WhatsApp!
+            Browse Clothes, Shoes & Jewelries.
           </p>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-8">
-        {/* Auto-Scrolling Showcase Carousel */}
-        {!loading && products.length > 0 && (
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-blue-600" /> Featured
-                Highlights
-              </h2>
-              <span className="text-[11px] text-blue-600 font-medium flex items-center">
-                Auto-sliding <ChevronRight className="w-3 h-3" />
-              </span>
-            </div>
-
-            <div
-              ref={carouselRef}
-              className="flex space-x-3 overflow-x-auto scrollbar-none py-2 px-1 scroll-smooth"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              {products.map((product) => (
-                <div
-                  key={`carousel-${product.id}`}
-                  className="min-w-[180px] sm:min-w-[220px] bg-white rounded-2xl p-2 border border-slate-100 shadow-sm flex-shrink-0"
-                >
-                  <div className="h-28 w-full bg-slate-100 rounded-xl overflow-hidden mb-2">
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <h4 className="text-xs font-semibold text-slate-800 truncate">
-                    {product.name}
-                  </h4>
-                  <p className="text-xs font-extrabold text-blue-600 mt-1">
-                    ₦{Number(product.price).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 flex-1 w-full space-y-8">
         {/* Trending / Hot Products Section */}
         {!loading &&
           trendingProducts.length > 0 &&
@@ -160,14 +178,11 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {trendingProducts.map((product) => (
-                  <ProductCard
-                    key={`trending-${product.id}`}
-                    product={product}
-                  />
-                ))}
-              </div>
+              <ProductCarouselRow
+                products={trendingProducts}
+                onSelect={setSelectedProduct}
+                hideLastOnMobile
+              />
             </section>
           )}
 
@@ -197,16 +212,15 @@ export default function HomePage() {
 
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {[...Array(10)].map((_, i) => (
+              {[...Array(10)].map((_, index) => (
                 <div
-                  key={i}
+                  key={index}
                   className="bg-white rounded-2xl h-64 animate-pulse border border-slate-100"
                 />
               ))}
             </div>
           ) : products.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
-              <Layers className="w-10 h-10 text-slate-300 mx-auto mb-2" />
               <h3 className="text-sm font-bold text-slate-700">
                 No products found
               </h3>
@@ -215,14 +229,41 @@ export default function HomePage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+            <div className="space-y-4">
+              {productRows.map((row, index) => (
+                <ProductCarouselRow
+                  key={`product-row-${index}`}
+                  products={row}
+                  onSelect={setSelectedProduct}
+                />
               ))}
             </div>
           )}
         </section>
       </main>
+
+      {selectedProduct && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setSelectedProduct(null)}
+        >
+          <div
+            className="w-full max-w-md max-h-[85vh] overflow-y-auto"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex justify-end mb-2">
+              <button
+                type="button"
+                onClick={() => setSelectedProduct(null)}
+                className="px-3 py-1.5 rounded-xl bg-white text-slate-700 text-xs font-bold"
+              >
+                Close
+              </button>
+            </div>
+            <ProductCard product={selectedProduct} />
+          </div>
+        </div>
+      )}
 
       <footer className="bg-white border-t border-slate-100 py-6 text-center text-xs text-slate-400">
         © {new Date().getFullYear()} Cynthy Gozy Collections. All rights

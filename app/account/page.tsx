@@ -1,9 +1,10 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
 import { User, Mail, Phone, Calendar, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function AccountContent() {
   const [profile, setProfile] = useState<{
@@ -13,7 +14,8 @@ export default function AccountContent() {
     created_at?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -38,17 +40,18 @@ export default function AccountContent() {
     };
 
     fetchProfile();
-  }, []);
+  }, [supabase]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/";
+    router.push("/");
+    router.refresh();
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar />
-      <main className="max-w-2xl mx-auto px-4 py-8 flex-1 w-full">
+      <Navbar showSearch={false} />
+      <main className="max-w-2xl mx-auto px-4 py-8 pb-24 flex-1 w-full">
         <h1 className="text-xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
           <User className="w-5 h-5 text-blue-600" /> My Account
         </h1>
