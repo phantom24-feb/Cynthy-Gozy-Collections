@@ -11,6 +11,7 @@ import {
   MessageSquareCode,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface CartItem {
   id: string;
@@ -37,7 +38,10 @@ export default function CartPage() {
   const [userName, setUserName] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderStatus, setOrderStatus] = useState<"processing" | "confirmed" | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   const fetchCart = useCallback(async () => {
     setLoading(true);
@@ -95,63 +99,94 @@ export default function CartPage() {
   );
 
   const handleWhatsAppCheckout = async () => {
+    if (checkoutLoading) return;
+
     const whatsappNumber = (
       process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ""
     ).replace(/\D/g, "");
-    if (!whatsappNumber || cartItems.length === 0) return;
+    if (!whatsappNumber) {
+      setCheckoutError("WhatsApp is not configured for this store.");
+      return;
+    }
+    if (cartItems.length === 0) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+    setCheckoutError(null);
+    setCheckoutLoading(true);
+    const whatsappWindow = window.open("about:blank", "_blank");
 
-    let message = `*New Order - Cynthy Gozy Collections*\n`;
-    message += `*Customer:* ${userName}\n`;
-    message += `------------------------------------\n\n`;
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) {
+        whatsappWindow?.close();
+        router.push("/login?redirectTo=/cart");
+        return;
+      }
 
-    cartItems.forEach((item, index) => {
-      message += `${index + 1}. *${item.products.name}*\n`;
-      message += `   Qty: ${item.quantity} | Price: ₦${(item.products.price * item.quantity).toLocaleString()}\n\n`;
-    });
+      let message = `*New Order - Cynthy Gozy Collections*\n`;
+      message += `*Customer:* ${userName}\n`;
+      message += `------------------------------------\n\n`;
 
-    message += `------------------------------------\n`;
-    message += `*Total Amount:* ₦${subtotal.toLocaleString()}\n\n`;
-    message += `Please confirm my order details!`;
+      cartItems.forEach((item, index) => {
+        message += `${index + 1}. *${item.products.name}*\n`;
+        message += `   Qty: ${item.quantity} | Price: ₦${(item.products.price * item.quantity).toLocaleString()}\n\n`;
+      });
 
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert({
-        user_id: user.id,
-        customer_name: userName,
-        total: subtotal,
-        items: cartItems.map((item) => ({
-          product_id: item.products.id,
-          name: item.products.name,
-          quantity: item.quantity,
-          price: item.products.price,
-        })),
-        status: "processing",
-      })
-      .select("id, total, status, created_at")
-      .single();
+      message += `------------------------------------\n`;
+      message += `*Total Amount:* ₦${subtotal.toLocaleString()}\n\n`;
+      message += `Please confirm my order details!`;
 
-    if (orderError || !order) return;
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          user_id: user.id,
+          customer_name: userName,
+          total: subtotal,
+          items: cartItems.map((item) => ({
+            product_id: item.products.id,
+            name: item.products.name,
+            quantity: item.quantity,
+            price: item.products.price,
+          })),
+          status: "processing",
+        })
+        .select("id, total, status, created_at")
+        .single();
 
-    const { error: clearCartError } = await supabase
-      .from("cart_items")
-      .delete()
-      .eq("user_id", user.id);
-    if (clearCartError) return;
+      if (orderError || !order) {
+        throw orderError || new Error("The order could not be created.");
+      }
 
-    setCartItems([]);
-    setOrders((current) => [order as Order, ...current]);
+      const { error: clearCartError } = await supabase
+        .from("cart_items")
+        .delete()
+        .eq("user_id", user.id);
+      if (clearCartError) throw clearCartError;
 
-    const encodedMessage = encodeURIComponent(message);
-    window.open(
-      `https://wa.me/${whatsappNumber}?text=${encodedMessage}`,
-      "_blank",
-    );
-    setOrderStatus("processing");
+      setCartItems([]);
+      setOrders((current) => [order as Order, ...current]);
+
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+      if (whatsappWindow) {
+        whatsappWindow.location.href = whatsappUrl;
+      } else {
+        window.location.href = whatsappUrl;
+      }
+      setOrderStatus("processing");
+    } catch (error) {
+      whatsappWindow?.close();
+      setCheckoutError(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit your order. Please try again.",
+      );
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   return (
@@ -262,7 +297,7 @@ export default function CartPage() {
 
               <button
                 onClick={handleWhatsAppCheckout}
-                disabled={orderStatus === "processing"}
+                disabled={orderStatus === "processing" || checkoutLoading}
                 className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-70"
               >
                 <MessageSquareCode className="w-4 h-4" />
@@ -270,8 +305,15 @@ export default function CartPage() {
                   ? "Order Confirmed"
                   : orderStatus === "processing"
                     ? "Order Processing"
-                    : "Order via WhatsApp"}
+                    : checkoutLoading
+                      ? "Opening WhatsApp..."
+                      : "Order via WhatsApp"}
               </button>
+              {checkoutError && (
+                <p className="text-xs text-red-600" role="alert">
+                  {checkoutError}
+                </p>
+              )}
             </div>
           </div>
         )}
