@@ -122,7 +122,7 @@ export default function Navbar({
             className={`p-2 rounded-xl transition flex items-center gap-1 text-xs font-semibold ${
               pathname === "/"
                 ? "bg-blue-50 text-blue-600 font-bold"
-                    : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
+                : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
             }`}
             title="Home"
           >
@@ -137,7 +137,7 @@ export default function Navbar({
               className={`p-2 rounded-xl transition flex items-center gap-1 text-xs font-semibold ${
                 pathname === "/admin"
                   ? "bg-blue-50 text-blue-600 font-bold"
-                    : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
+                  : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
               }`}
               title="Admin Portal"
             >
@@ -153,7 +153,7 @@ export default function Navbar({
             className={`p-2 rounded-xl transition relative flex items-center gap-1 text-xs font-semibold ${
               pathname === "/cart"
                 ? "bg-blue-50 text-blue-600 font-bold"
-                    : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
+                : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
             }`}
             title="Shopping Cart"
           >
@@ -172,7 +172,7 @@ export default function Navbar({
             className={`p-2 rounded-xl transition flex items-center gap-1 text-xs font-semibold ${
               pathname === "/account"
                 ? "bg-blue-50 text-blue-600 font-bold"
-                    : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
+                : "text-slate-700 hover:text-blue-600 hover:bg-slate-50"
             }`}
             title="Account"
           >

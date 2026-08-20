@@ -719,7 +719,10 @@ export default function AdminPage() {
                 {sizesOpen && (
                   <div className="relative grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-white p-2 pr-9 mb-1.5">
                     {PRESET_SIZES.map((sz) => (
-                      <label key={sz} className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs text-slate-700 hover:bg-slate-50">
+                      <label
+                        key={sz}
+                        className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                      >
                         <input
                           type="checkbox"
                           checked={selectedSizes.includes(sz)}
@@ -808,7 +811,10 @@ export default function AdminPage() {
                 {colorsOpen && (
                   <div className="relative grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-white p-2 pr-9 mb-1.5">
                     {PRESET_COLORS.map((clr) => (
-                      <label key={clr} className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs text-slate-700 hover:bg-slate-50">
+                      <label
+                        key={clr}
+                        className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                      >
                         <input
                           type="checkbox"
                           checked={selectedColors.includes(clr)}

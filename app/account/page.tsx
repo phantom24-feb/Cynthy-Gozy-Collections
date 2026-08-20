@@ -111,7 +111,11 @@ export default function AccountContent() {
               className="w-full mt-4 py-2.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-2"
               aria-pressed={theme === "dark"}
             >
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {theme === "dark" ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
               Use {theme === "dark" ? "Light" : "Dark"} Mode
             </button>
 

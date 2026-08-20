@@ -62,6 +62,7 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderStatus, setOrderStatus] = useState<
     "processing" | "confirmed" | null
@@ -81,10 +82,16 @@ export default function CartPage() {
 
     if (user) {
       setUserName(user.user_metadata?.full_name || user.email || "Customer");
-      const { data } = await supabase
-        .from("cart_items")
-        .select("id, quantity, created_at, products(id, name, price, image_url, category)")
-        .eq("user_id", user.id);
+      const [{ data, error: cartError }, { data: profile }] = await Promise.all([
+        supabase
+          .from("cart_items")
+          .select("id, quantity, created_at, products(id, name, price, image_url, category)")
+          .eq("user_id", user.id),
+        supabase.from("profiles").select("delivery_address").eq("id", user.id).maybeSingle(),
+      ]);
+
+      if (cartError) throw cartError;
+      setDeliveryAddress(profile?.delivery_address || user.user_metadata?.delivery_address || "");
 
       if (data) {
         const cutoff = Date.now() - 20 * 24 * 60 * 60 * 1000;
@@ -174,6 +181,7 @@ export default function CartPage() {
 
       let message = `*New Order - Cynthy Gozy Collections*\n`;
       message += `*Customer:* ${userName}\n`;
+      message += `*Delivery Address:* ${deliveryAddress.trim() || "Not provided"}\n`;
       message += `------------------------------------\n\n`;
 
       cartItems.forEach((item, index) => {
@@ -190,6 +198,7 @@ export default function CartPage() {
         .insert({
           user_id: user.id,
           customer_name: userName,
+          delivery_address: deliveryAddress.trim(),
           total: subtotal,
           items: cartItems.map((item) => ({
             product_id: item.products.id,
@@ -207,6 +216,13 @@ export default function CartPage() {
         throw orderError || new Error("The order could not be created.");
       }
 
+      if (deliveryAddress.trim()) {
+        await supabase
+          .from("profiles")
+          .update({ delivery_address: deliveryAddress.trim() })
+          .eq("id", user.id);
+      }
+
       const { error: clearCartError } = await supabase
         .from("cart_items")
         .delete()
@@ -217,11 +233,23 @@ export default function CartPage() {
       setOrders((current) => [order as Order, ...current]);
 
       const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodedMessage}`;
-      if (whatsappWindow) {
-        whatsappWindow.location.href = whatsappUrl;
+      const webUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isAndroid = userAgent.includes("android");
+      const isIOS = /iphone|ipad|ipod/.test(userAgent);
+      const nativeUrl = isAndroid
+        ? `intent://send?phone=${whatsappNumber}&text=${encodedMessage}#Intent;scheme=whatsapp;package=com.whatsapp;end`
+        : `whatsapp://send?phone=${whatsappNumber}&text=${encodedMessage}`;
+
+      if (isAndroid || isIOS) {
+        window.open(nativeUrl, "_self");
+        window.setTimeout(() => {
+          if (!document.hidden) window.open(webUrl, "_self");
+        }, 1200);
+      } else if (whatsappWindow) {
+        whatsappWindow.location.href = webUrl;
       } else {
-        window.open(whatsappUrl, "_self");
+        window.open(webUrl, "_self");
       }
       setOrderStatus("processing");
     } catch (error) {
@@ -352,6 +380,17 @@ export default function CartPage() {
                   ₦{subtotal.toLocaleString()}
                 </span>
               </div>
+
+              <label className="block text-xs font-semibold text-slate-700">
+                Delivery address and landmark
+                <textarea
+                  value={deliveryAddress}
+                  onChange={(event) => setDeliveryAddress(event.target.value)}
+                  placeholder="Street, area, city, and a notable landmark"
+                  rows={3}
+                  className="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </label>
 
               <button
                 onClick={handleWhatsAppCheckout}

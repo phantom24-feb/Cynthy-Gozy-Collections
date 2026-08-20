@@ -27,7 +27,9 @@ body {
 
 button,
 [role="button"] {
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition:
+    transform 120ms ease,
+    opacity 120ms ease;
 }
 
 button:active,
