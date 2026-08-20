@@ -7,9 +7,24 @@ import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
 
 interface OrderItem {
+  product_id: string;
   name: string;
   quantity: number;
   price: number;
+  image_url?: string | string[];
+}
+
+function getFirstImage(value?: string | string[]) {
+  if (Array.isArray(value)) return value[0] || "";
+  if (!value) return "";
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed))
+      return typeof parsed[0] === "string" ? parsed[0] : "";
+  } catch {
+    // Keep supporting existing single-image URLs.
+  }
+  return value;
 }
 
 interface Order {
@@ -117,13 +132,20 @@ export default function AdminOrdersPage() {
 
                 <div className="mt-3 border-t border-slate-100 pt-3 space-y-1">
                   {order.items.map((item, index) => (
-                    <p
+                    <div
                       key={`${order.id}-${index}`}
-                      className="text-xs text-slate-600"
+                      className="flex items-center gap-3 text-xs text-slate-600"
                     >
-                      {item.quantity} x {item.name} - ₦
-                      {Number(item.price).toLocaleString()}
-                    </p>
+                      <img
+                        src={getFirstImage(item.image_url)}
+                        alt={item.name}
+                        className="h-12 w-12 rounded-lg bg-slate-100 object-cover"
+                      />
+                      <span>
+                        {item.quantity} x {item.name} - ₦
+                        {Number(item.price).toLocaleString()}
+                      </span>
+                    </div>
                   ))}
                 </div>
 

@@ -2,6 +2,7 @@ create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   customer_name text not null default '',
+  delivery_address text not null default '',
   total numeric not null default 0,
   items jsonb not null default '[]'::jsonb,
   status text not null default 'processing' check (status in ('processing', 'confirmed')),
@@ -9,6 +10,8 @@ create table if not exists public.orders (
 );
 
 alter table public.orders enable row level security;
+
+alter table public.orders add column if not exists delivery_address text not null default '';
 
 create policy "Users can read their own orders"
 on public.orders for select

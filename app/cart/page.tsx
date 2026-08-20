@@ -20,7 +20,7 @@ interface CartItem {
     id: string;
     name: string;
     price: number;
-    image_url: string;
+    image_url: string | string[];
     category: string;
   };
 }
@@ -30,6 +30,28 @@ interface Order {
   total: number;
   status: "processing" | "confirmed";
   created_at: string;
+  items?: OrderItem[];
+}
+
+interface OrderItem {
+  product_id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  image_url?: string | string[];
+}
+
+function getFirstImage(value?: string | string[]) {
+  if (Array.isArray(value)) return value[0] || "";
+  if (!value) return "";
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed))
+      return typeof parsed[0] === "string" ? parsed[0] : "";
+  } catch {
+    // Keep supporting existing single-image URLs.
+  }
+  return value;
 }
 
 const DEFAULT_WHATSAPP_NUMBER = "2348147850652";
@@ -66,7 +88,7 @@ export default function CartPage() {
 
       const { data: orderHistory } = await supabase
         .from("orders")
-        .select("id, total, status, created_at")
+        .select("id, total, status, created_at, items")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       const typedOrders = (orderHistory || []) as Order[];
@@ -154,6 +176,7 @@ export default function CartPage() {
             name: item.products.name,
             quantity: item.quantity,
             price: item.products.price,
+            image_url: item.products.image_url,
           })),
           status: "processing",
         })
@@ -236,7 +259,7 @@ export default function CartPage() {
                   <div className="flex items-center space-x-3">
                     <div className="w-16 h-16 rounded-xl bg-slate-50 overflow-hidden">
                       <img
-                        src={item.products.image_url}
+                        src={getFirstImage(item.products.image_url)}
                         alt={item.products.name}
                         className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
                       />
@@ -334,13 +357,25 @@ export default function CartPage() {
                   key={order.id}
                   className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center justify-between gap-3"
                 >
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">
-                      Order #{order.id.slice(0, 8)}
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      {new Date(order.created_at).toLocaleString()}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex -space-x-2">
+                      {(order.items || []).slice(0, 3).map((item, index) => (
+                        <img
+                          key={`${order.id}-image-${index}`}
+                          src={getFirstImage(item.image_url)}
+                          alt={item.name}
+                          className="h-10 w-10 rounded-lg border-2 border-white bg-slate-100 object-cover"
+                        />
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">
+                        Order #{order.id.slice(0, 8)}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {new Date(order.created_at).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-extrabold text-blue-600">
