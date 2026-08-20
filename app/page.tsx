@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Sparkles, Flame } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
-const CATEGORIES = ["All", "Men", "Women", "Clothes", "Shoes", "Jewelry"];
+const CATEGORIES = ["All", "Men", "Women", "Clothes", "Shoes", "Jewelries"];
 
 function ProductCarouselRow({
   products,
@@ -112,10 +112,7 @@ export default function HomePage() {
       } else if (selectedCategory === "Women") {
         query = query.eq("gender", "Female");
       } else if (selectedCategory !== "All") {
-        query = query.eq(
-          "category",
-          selectedCategory === "Jewelry" ? "Jewelry" : selectedCategory,
-        );
+        query = query.eq("category", selectedCategory);
       }
 
       if (searchQuery) {

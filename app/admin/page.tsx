@@ -29,7 +29,7 @@ interface Product {
   colors?: string | string[];
 }
 
-const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelry"];
+const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelries"];
 const GENDERS = ["Male", "Female", "Unisex"];
 
 function parseVariantValues(value?: string | string[]) {
