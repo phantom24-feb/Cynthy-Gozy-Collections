@@ -82,33 +82,57 @@ export default function CartPage() {
 
     if (user) {
       setUserName(user.user_metadata?.full_name || user.email || "Customer");
-      const [{ data, error: cartError }, { data: profile }] = await Promise.all([
-        supabase
-          .from("cart_items")
-          .select("id, quantity, created_at, products(id, name, price, image_url, category)")
-          .eq("user_id", user.id),
-        supabase.from("profiles").select("delivery_address").eq("id", user.id).maybeSingle(),
-      ]);
+      const [{ data, error: cartError }, { data: profile }] = await Promise.all(
+        [
+          supabase
+            .from("cart_items")
+            .select(
+              "id, quantity, created_at, products(id, name, price, image_url, category)",
+            )
+            .eq("user_id", user.id),
+          supabase
+            .from("profiles")
+            .select("delivery_address")
+            .eq("id", user.id)
+            .maybeSingle(),
+        ],
+      );
 
       if (cartError) throw cartError;
-      setDeliveryAddress(profile?.delivery_address || user.user_metadata?.delivery_address || "");
+      setDeliveryAddress(
+        profile?.delivery_address || user.user_metadata?.delivery_address || "",
+      );
 
       if (data) {
         const cutoff = Date.now() - 20 * 24 * 60 * 60 * 1000;
         const freshItems = (data as unknown as CartItem[]).filter(
-          (item) => !item.created_at || new Date(item.created_at).getTime() > cutoff,
+          (item) =>
+            !item.created_at || new Date(item.created_at).getTime() > cutoff,
         );
         const expiredItems = (data as unknown as CartItem[]).filter(
-          (item) => item.created_at && new Date(item.created_at).getTime() <= cutoff,
+          (item) =>
+            item.created_at && new Date(item.created_at).getTime() <= cutoff,
         );
         if (expiredItems.length > 0) {
           await supabase
             .from("cart_items")
             .delete()
-            .in("id", expiredItems.map((item) => item.id));
+            .in(
+              "id",
+              expiredItems.map((item) => item.id),
+            );
           setCartNotice("Items left in your cart for 20 days were cleared.");
-        } else if (freshItems.some((item) => item.created_at && Date.now() - new Date(item.created_at).getTime() >= 15 * 24 * 60 * 60 * 1000)) {
-          setCartNotice("Your cart will be cleared after 20 days if you do not place an order.");
+        } else if (
+          freshItems.some(
+            (item) =>
+              item.created_at &&
+              Date.now() - new Date(item.created_at).getTime() >=
+                15 * 24 * 60 * 60 * 1000,
+          )
+        ) {
+          setCartNotice(
+            "Your cart will be cleared after 20 days if you do not place an order.",
+          );
         }
         setCartItems(freshItems);
       }
@@ -270,7 +294,10 @@ export default function CartPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 flex-1 w-full space-y-6">
         {cartNotice && (
-          <p className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800" role="status">
+          <p
+            className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800"
+            role="status"
+          >
             {cartNotice}
           </p>
         )}
@@ -429,22 +456,25 @@ export default function CartPage() {
                   tabIndex={0}
                   onClick={() => setSelectedOrder(order)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") setSelectedOrder(order);
+                    if (event.key === "Enter" || event.key === " ")
+                      setSelectedOrder(order);
                   }}
                   className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex -space-x-2">
-                      {(order.items || []).slice(0, 3).map((item, index) => (
-                        getFirstImage(item.image_url) ? (
-                          <img
-                            key={`${order.id}-image-${index}`}
-                            src={getFirstImage(item.image_url)}
-                            alt={item.name}
-                            className="h-10 w-10 rounded-lg border-2 border-white bg-slate-100 object-cover"
-                          />
-                        ) : null
-                      ))}
+                      {(order.items || [])
+                        .slice(0, 3)
+                        .map((item, index) =>
+                          getFirstImage(item.image_url) ? (
+                            <img
+                              key={`${order.id}-image-${index}`}
+                              src={getFirstImage(item.image_url)}
+                              alt={item.name}
+                              className="h-10 w-10 rounded-lg border-2 border-white bg-slate-100 object-cover"
+                            />
+                          ) : null,
+                        )}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-900">
@@ -475,24 +505,60 @@ export default function CartPage() {
           )}
         </section>
         {selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4" onClick={() => setSelectedOrder(null)}>
-            <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+            onClick={() => setSelectedOrder(null)}
+          >
+            <div
+              className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
-                  <h2 className="text-base font-extrabold text-slate-900">Order #{selectedOrder.id.slice(0, 8)}</h2>
-                  <p className="text-xs text-slate-500">{new Date(selectedOrder.created_at).toLocaleString()}</p>
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    Order #{selectedOrder.id.slice(0, 8)}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    {new Date(selectedOrder.created_at).toLocaleString()}
+                  </p>
                 </div>
-                <button type="button" onClick={() => setSelectedOrder(null)} className="rounded-lg p-2 text-slate-500" aria-label="Close order details"><X className="h-4 w-4" /></button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  className="rounded-lg p-2 text-slate-500"
+                  aria-label="Close order details"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
               <div className="mt-4 space-y-3">
                 {(selectedOrder.items || []).map((item, index) => (
-                  <div key={`${selectedOrder.id}-detail-${index}`} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
-                    {getFirstImage(item.image_url) ? <img src={getFirstImage(item.image_url)} alt={item.name} className="h-16 w-16 rounded-lg bg-slate-100 object-cover" /> : null}
-                    <div className="text-xs"><p className="font-bold text-slate-900">{item.name}</p><p className="mt-1 text-slate-500">Quantity: {item.quantity}</p><p className="mt-1 font-extrabold text-blue-600">₦{Number(item.price).toLocaleString()}</p></div>
+                  <div
+                    key={`${selectedOrder.id}-detail-${index}`}
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 p-3"
+                  >
+                    {getFirstImage(item.image_url) ? (
+                      <img
+                        src={getFirstImage(item.image_url)}
+                        alt={item.name}
+                        className="h-16 w-16 rounded-lg bg-slate-100 object-cover"
+                      />
+                    ) : null}
+                    <div className="text-xs">
+                      <p className="font-bold text-slate-900">{item.name}</p>
+                      <p className="mt-1 text-slate-500">
+                        Quantity: {item.quantity}
+                      </p>
+                      <p className="mt-1 font-extrabold text-blue-600">
+                        ₦{Number(item.price).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-right text-sm font-extrabold text-blue-600">Total: ₦{Number(selectedOrder.total).toLocaleString()}</p>
+              <p className="mt-4 text-right text-sm font-extrabold text-blue-600">
+                Total: ₦{Number(selectedOrder.total).toLocaleString()}
+              </p>
             </div>
           </div>
         )}
