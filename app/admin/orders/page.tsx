@@ -136,11 +136,17 @@ export default function AdminOrdersPage() {
                       key={`${order.id}-${index}`}
                       className="flex items-center gap-3 text-xs text-slate-600"
                     >
-                      <img
-                        src={getFirstImage(item.image_url)}
-                        alt={item.name}
-                        className="h-12 w-12 rounded-lg bg-slate-100 object-cover"
-                      />
+                      {getFirstImage(item.image_url) ? (
+                        <img
+                          src={getFirstImage(item.image_url)}
+                          alt={item.name}
+                          className="h-12 w-12 rounded-lg bg-slate-100 object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-[9px] text-slate-400">
+                          No image
+                        </div>
+                      )}
                       <span>
                         {item.quantity} x {item.name} - ₦
                         {Number(item.price).toLocaleString()}

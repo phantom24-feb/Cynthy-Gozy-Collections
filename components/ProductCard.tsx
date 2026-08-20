@@ -249,14 +249,20 @@ export default function ProductCard({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <img
-            ref={imageRef}
-            src={imageList[activeImage] || imageList[0] || ""}
-            alt={product.name}
-            className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${
-              compact ? "object-cover" : "object-contain"
-            }`}
-          />
+          {imageList[activeImage] || imageList[0] ? (
+            <img
+              ref={imageRef}
+              src={imageList[activeImage] || imageList[0]}
+              alt={product.name}
+              className={`w-full h-full transition-transform duration-500 group-hover:scale-105 ${
+                compact ? "object-cover" : "object-contain"
+              }`}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-xs text-slate-400">
+              No image
+            </div>
+          )}
           <span className="absolute top-2 left-2 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
             {product.category}
           </span>
@@ -293,7 +299,7 @@ export default function ProductCard({
         </p>
 
         {compact && (sizeList.length > 0 || colorList.length > 0) && (
-          <p className="text-[10px] text-slate-500 mt-2 line-clamp-2">
+          <p className="text-[10px] text-slate-500 mt-2 truncate whitespace-nowrap">
             {sizeList.length > 0 && `Sizes: ${sizeList.join(", ")}`}
             {sizeList.length > 0 && colorList.length > 0 && " | "}
             {colorList.length > 0 && `Colors: ${colorList.join(", ")}`}

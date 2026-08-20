@@ -3,8 +3,9 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
-import { User, Mail, Phone, Calendar, LogOut } from "lucide-react";
+import { User, Mail, Phone, Calendar, LogOut, Moon, Sun } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { setTheme } from "@/components/ThemeProvider";
 
 export default function AccountContent() {
   const [profile, setProfile] = useState<{
@@ -14,6 +15,12 @@ export default function AccountContent() {
     created_at?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setCurrentTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+    return window.localStorage.getItem("cynthy-gozy-theme") === "dark"
+      ? "dark"
+      : "light";
+  });
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -46,6 +53,12 @@ export default function AccountContent() {
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
+  };
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setCurrentTheme(nextTheme);
+    setTheme(nextTheme);
   };
 
   return (
@@ -91,6 +104,16 @@ export default function AccountContent() {
                 </span>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="w-full mt-4 py-2.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-2"
+              aria-pressed={theme === "dark"}
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              Use {theme === "dark" ? "Light" : "Dark"} Mode
+            </button>
 
             <button
               onClick={handleSignOut}
