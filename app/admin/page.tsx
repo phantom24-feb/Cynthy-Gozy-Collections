@@ -76,33 +76,38 @@ function parseImageValues(value?: string | string[]) {
 }
 
 async function compressImage(file: File) {
-  const bitmap = await createImageBitmap(file);
-  const maxDimension = 1600;
-  const scale = Math.min(
-    1,
-    maxDimension / Math.max(bitmap.width, bitmap.height),
-  );
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDimension = 1600;
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(bitmap.width, bitmap.height),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
 
-  if (!context) {
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.82),
+    );
+    return blob
+      ? new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, {
+          type: "image/jpeg",
+        })
+      : file;
+  } catch {
+    // Keep formats unsupported by browser image decoding uploadable.
     return file;
   }
-
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.82),
-  );
-  return blob
-    ? new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, {
-        type: "image/jpeg",
-      })
-    : file;
 }
 
 const PRESET_SIZES = [
@@ -205,7 +210,10 @@ export default function AdminPage() {
       .order("created_at", { ascending: false });
 
     if (selectedCategory !== "All") {
-      query = query.eq("category", selectedCategory);
+      query =
+        selectedCategory === "Jewelries"
+          ? query.eq("category", "Jewelries")
+          : query.eq("category", selectedCategory);
     }
 
     const { data } = await query;
@@ -273,68 +281,62 @@ export default function AdminPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploading(true);
+    try {
+      let imageUrls = previewUrls;
 
-    let imageUrls = previewUrls;
+      if (imageFiles.length > 0) {
+        const uploadedUrls: string[] = [];
+        for (const imageFile of imageFiles) {
+          const uploadFile = await compressImage(imageFile);
+          const fileExt = uploadFile.name.split(".").pop() || "jpg";
+          const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
 
-    // Upload selected gallery file to Supabase Storage
-    if (imageFiles.length > 0) {
-      const uploadedUrls: string[] = [];
-      for (const imageFile of imageFiles) {
-        const compressedImage = await compressImage(imageFile);
-        const fileExt = compressedImage.name.split(".").pop();
-        const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from("products")
+            .upload(fileName, uploadFile, {
+              contentType: uploadFile.type || "application/octet-stream",
+              upsert: false,
+            });
 
-        const { error: uploadError } = await supabase.storage
-          .from("products")
-          .upload(fileName, compressedImage, {
-            contentType: compressedImage.type,
-          });
+          if (uploadError) throw new Error(uploadError.message);
 
-        if (uploadError) {
-          showToast("Image upload failed: " + uploadError.message, "error");
-          setUploading(false);
-          return;
+          const { data: publicUrlData } = supabase.storage
+            .from("products")
+            .getPublicUrl(fileName);
+          uploadedUrls.push(publicUrlData.publicUrl);
         }
-
-        const { data: publicUrlData } = supabase.storage
-          .from("products")
-          .getPublicUrl(fileName);
-        uploadedUrls.push(publicUrlData.publicUrl);
+        imageUrls = uploadedUrls;
       }
-      imageUrls = uploadedUrls;
-    }
 
-    const payload = {
-      name,
-      description: description || "",
-      price: parseFloat(price) || "",
-      category: category || "Clothes",
-      gender: gender || "Unisex",
-      image_url: JSON.stringify(imageUrls),
-      sizes: selectedSizes.join(","),
-      colors: selectedColors.join(","),
-    };
+      const payload = {
+        name,
+        description: description || "",
+        price: parseFloat(price) || "",
+        category: category || "Clothes",
+        gender: gender || "Unisex",
+        image_url: JSON.stringify(imageUrls),
+        sizes: selectedSizes.join(","),
+        colors: selectedColors.join(","),
+      };
 
-    let result;
-    if (editingProduct) {
-      result = await supabase
-        .from("products")
-        .update(payload)
-        .eq("id", editingProduct.id);
-    } else {
-      result = await supabase.from("products").insert([payload]);
-    }
+      const result = editingProduct
+        ? await supabase.from("products").update(payload).eq("id", editingProduct.id)
+        : await supabase.from("products").insert([payload]);
 
-    if (result.error) {
-      showToast("Failed to save product: " + result.error.message, "error");
+      if (result.error) throw new Error(result.error.message);
+
+      showToast("Product saved successfully!", "success");
+      setIsModalOpen(false);
+      setEditingProduct(null);
+      await fetchProducts();
+    } catch (error) {
+      showToast(
+        `Unable to save product: ${error instanceof Error ? error.message : "Please try again."}`,
+        "error",
+      );
+    } finally {
       setUploading(false);
-      return;
     }
-    showToast("Product saved successfully!", "success");
-    setUploading(false);
-    setIsModalOpen(false);
-    setEditingProduct(null);
-    await fetchProducts();
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -475,11 +477,9 @@ export default function AdminPage() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             {visibleProducts.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-              >
-                <div className="relative h-48 bg-slate-100">
+              <div key={product.id} className="relative min-w-0">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="relative h-48 bg-slate-100">
                   {(() => {
                     const imageUrl =
                       parseImageValues(product.image_url)[0] ||
@@ -498,31 +498,6 @@ export default function AdminPage() {
                       </div>
                     );
                   })()}
-                  <button
-                    type="button"
-                    aria-label="Product actions"
-                    onClick={() =>
-                      setOpenMenuProductId(
-                        openMenuProductId === product.id ? null : product.id,
-                      )
-                    }
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 text-slate-700 shadow-sm"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                  {openMenuProductId === product.id && (
-                    <div className="absolute top-11 right-2 z-10 w-44 rounded-xl bg-white border border-slate-200 shadow-lg p-1">
-                      <button
-                        type="button"
-                        onClick={() => void toggleTrending(product)}
-                        className="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        {product.trending
-                          ? "Remove from Trending"
-                          : "Add to Trending"}
-                      </button>
-                    </div>
-                  )}
                   <span className="absolute top-2 left-2 bg-slate-900/75 text-white text-[10px] font-bold px-2 py-1 rounded-full">
                     {product.category}
                   </span>
@@ -546,21 +521,45 @@ export default function AdminPage() {
                     <button
                       type="button"
                       onClick={() => openEditModal(product)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-100 px-3 py-2 rounded-xl text-[11px] font-bold"
+                      className="min-w-0 flex-1 inline-flex items-center justify-center gap-1 bg-blue-50 text-blue-700 border border-blue-100 px-2 py-2 rounded-xl text-[11px] font-bold"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      Edit
+                      <Edit2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Edit</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteProduct(product.id)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 bg-red-50 text-red-600 border border-red-100 px-3 py-2 rounded-xl text-[11px] font-bold"
+                      className="min-w-0 flex-1 inline-flex items-center justify-center gap-1 bg-red-50 text-red-600 border border-red-100 px-2 py-2 rounded-xl text-[11px] font-bold"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete
+                      <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Delete</span>
                     </button>
                   </div>
                 </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Product actions"
+                  onClick={() =>
+                    setOpenMenuProductId(
+                      openMenuProductId === product.id ? null : product.id,
+                    )
+                  }
+                  className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-slate-900 text-white border border-white/40 shadow-lg"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+                {openMenuProductId === product.id && (
+                  <div className="absolute top-11 right-2 z-20 w-44 rounded-xl bg-slate-900 border border-slate-600 shadow-xl p-1">
+                    <button
+                      type="button"
+                      onClick={() => void toggleTrending(product)}
+                      className="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold text-white hover:bg-slate-700 focus-visible:bg-slate-700"
+                    >
+                      {product.trending ? "Remove from Trending" : "Add to Trending"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

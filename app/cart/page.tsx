@@ -82,7 +82,10 @@ export default function CartPage() {
 
     if (user) {
       setUserName(user.user_metadata?.full_name || user.email || "Customer");
-      const [{ data, error: cartError }, { data: profile }] = await Promise.all(
+      const [
+        { data: initialData, error: initialCartError },
+        { data: profile },
+      ] = await Promise.all(
         [
           supabase
             .from("cart_items")
@@ -97,7 +100,17 @@ export default function CartPage() {
             .maybeSingle(),
         ],
       );
+      let data = initialData;
+      let cartError = initialCartError;
 
+      if (cartError?.message?.includes("created_at")) {
+        const fallbackCart = await supabase
+          .from("cart_items")
+          .select("id, quantity, products(id, name, price, image_url, category)")
+          .eq("user_id", user.id);
+        data = fallbackCart.data as typeof data;
+        cartError = fallbackCart.error;
+      }
       if (cartError) throw cartError;
       setDeliveryAddress(
         profile?.delivery_address || user.user_metadata?.delivery_address || "",
@@ -189,7 +202,33 @@ export default function CartPage() {
 
     setCheckoutError(null);
     setCheckoutLoading(true);
-    const whatsappWindow = window.open("about:blank", "_blank");
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isAndroid = userAgent.includes("android");
+    const isIOS = /iphone|ipad|ipod/.test(userAgent);
+
+    let message = `*New Order - Cynthy Gozy Collections*\n`;
+    message += `*Customer:* ${userName}\n`;
+    message += `*Delivery Address:* ${deliveryAddress.trim() || "Not provided"}\n`;
+    message += `------------------------------------\n\n`;
+
+    cartItems.forEach((item, index) => {
+      message += `${index + 1}. *${item.products.name}*\n`;
+      message += `   Qty: ${item.quantity} | Price: ₦${(item.products.price * item.quantity).toLocaleString()}\n\n`;
+    });
+
+    message += `------------------------------------\n`;
+    message += `*Total Amount:* ₦${subtotal.toLocaleString()}\n\n`;
+    message += `Please confirm my order details!`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = isAndroid
+      ? `intent://send?phone=${whatsappNumber}&text=${encodedMessage}#Intent;package=com.whatsapp;scheme=whatsapp;end`
+      : isIOS
+        ? `whatsapp://send?phone=${whatsappNumber}&text=${encodedMessage}`
+        : `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+
+    // eslint-disable-next-line react-hooks/immutability -- Must navigate synchronously from the click event.
+    window.location.href = whatsappUrl;
 
     try {
       const {
@@ -198,26 +237,11 @@ export default function CartPage() {
       } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) {
-        whatsappWindow?.close();
         router.push("/login?redirectTo=/cart");
         return;
       }
 
-      let message = `*New Order - Cynthy Gozy Collections*\n`;
-      message += `*Customer:* ${userName}\n`;
-      message += `*Delivery Address:* ${deliveryAddress.trim() || "Not provided"}\n`;
-      message += `------------------------------------\n\n`;
-
-      cartItems.forEach((item, index) => {
-        message += `${index + 1}. *${item.products.name}*\n`;
-        message += `   Qty: ${item.quantity} | Price: ₦${(item.products.price * item.quantity).toLocaleString()}\n\n`;
-      });
-
-      message += `------------------------------------\n`;
-      message += `*Total Amount:* ₦${subtotal.toLocaleString()}\n\n`;
-      message += `Please confirm my order details!`;
-
-      const { data: order, error: orderError } = await supabase
+      let { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
           user_id: user.id,
@@ -235,6 +259,28 @@ export default function CartPage() {
         })
         .select("id, total, status, created_at, items")
         .single();
+
+      if (orderError?.message?.includes("delivery_address")) {
+        const fallbackOrder = await supabase
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            customer_name: userName,
+            total: subtotal,
+            items: cartItems.map((item) => ({
+              product_id: item.products.id,
+              name: item.products.name,
+              quantity: item.quantity,
+              price: item.products.price,
+              image_url: item.products.image_url,
+            })),
+            status: "processing",
+          })
+          .select("id, total, status, created_at, items")
+          .single();
+        order = fallbackOrder.data;
+        orderError = fallbackOrder.error;
+      }
 
       if (orderError || !order) {
         throw orderError || new Error("The order could not be created.");
@@ -255,29 +301,8 @@ export default function CartPage() {
 
       setCartItems([]);
       setOrders((current) => [order as Order, ...current]);
-
-      const encodedMessage = encodeURIComponent(message);
-      const webUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isAndroid = userAgent.includes("android");
-      const isIOS = /iphone|ipad|ipod/.test(userAgent);
-      const nativeUrl = isAndroid
-        ? `intent://send?phone=${whatsappNumber}&text=${encodedMessage}#Intent;scheme=whatsapp;package=com.whatsapp;end`
-        : `whatsapp://send?phone=${whatsappNumber}&text=${encodedMessage}`;
-
-      if (isAndroid || isIOS) {
-        window.open(nativeUrl, "_self");
-        window.setTimeout(() => {
-          if (!document.hidden) window.open(webUrl, "_self");
-        }, 1200);
-      } else if (whatsappWindow) {
-        whatsappWindow.location.href = webUrl;
-      } else {
-        window.open(webUrl, "_self");
-      }
       setOrderStatus("processing");
     } catch (error) {
-      whatsappWindow?.close();
       setCheckoutError(
         error instanceof Error
           ? error.message

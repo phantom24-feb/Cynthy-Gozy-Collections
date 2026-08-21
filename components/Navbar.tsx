@@ -29,20 +29,14 @@ export default function Navbar({
       } = await supabase.auth.getUser();
 
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
+        const [{ data: profile }, { data: cartItems }] = await Promise.all([
+          supabase.from("profiles").select("role").eq("id", user.id).single(),
+          supabase.from("cart_items").select("quantity").eq("user_id", user.id),
+        ]);
 
         if (profile?.role === "admin") {
           setIsAdmin(true);
         }
-
-        const { data: cartItems } = await supabase
-          .from("cart_items")
-          .select("quantity")
-          .eq("user_id", user.id);
 
         if (cartItems) {
           const totalCount = cartItems.reduce(

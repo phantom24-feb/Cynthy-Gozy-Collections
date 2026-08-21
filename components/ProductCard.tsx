@@ -267,7 +267,7 @@ export default function ProductCard({
             {product.category}
           </span>
           {product.gender && (
-            <span className="absolute top-2 right-2 bg-white/90 text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+            <span className="product-gender-badge absolute top-2 right-2 bg-white/95 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm">
               {product.gender}
             </span>
           )}

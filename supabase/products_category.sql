@@ -1,5 +1,5 @@
 -- Run this migration once in Supabase SQL Editor.
--- Keep the requested UI value "Jewelries" and accept legacy "Jewelry" rows too.
+-- Normalize legacy rows before enforcing the requested "Jewelries" value.
 do $$
 declare
   constraint_record record;
@@ -21,6 +21,10 @@ begin
   end loop;
 end $$;
 
+update public.products
+set category = 'Jewelries'
+where category = 'Jewelry';
+
 alter table public.products
 add constraint products_category_check
-check (category in ('Clothes', 'Shoes', 'Jewelries', 'Jewelry'));
+check (category in ('Clothes', 'Shoes', 'Jewelries'));

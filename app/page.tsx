@@ -104,7 +104,7 @@ export default function HomePage() {
       setLoading(true);
       let query = supabase
         .from("products")
-        .select("*")
+        .select("id, name, description, price, category, gender, trending, image_url, sizes, colors")
         .order("created_at", { ascending: false });
 
       if (selectedCategory === "Men") {
@@ -120,7 +120,6 @@ export default function HomePage() {
       }
 
       const { data, error } = await query;
-      console.log("Homepage fetched products:", data, "Error:", error);
       if (!error && data) {
         setProducts(data);
       }
