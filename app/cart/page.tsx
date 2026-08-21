@@ -30,10 +30,12 @@ interface CartItem {
 interface Order {
   id: string;
   total: number;
-  status: "processing" | "confirmed";
+  status: OrderStatus;
   created_at: string;
   items?: OrderItem[];
 }
+
+type OrderStatus = "processing" | "confirmed" | "shipped" | "delivered";
 
 interface OrderItem {
   product_id: string;
@@ -64,9 +66,7 @@ export default function CartPage() {
   const [userName, setUserName] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
-  const [orderStatus, setOrderStatus] = useState<
-    "processing" | "confirmed" | null
-  >(null);
+  const [orderStatus, setOrderStatus] = useState<OrderStatus | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [cartNotice, setCartNotice] = useState<string | null>(null);
@@ -516,9 +516,13 @@ export default function CartPage() {
                     </p>
                     <p
                       className={`text-[10px] font-bold uppercase mt-1 ${
-                        order.status === "confirmed"
+                        order.status === "delivered"
                           ? "text-emerald-600"
-                          : "text-amber-600"
+                          : order.status === "shipped"
+                            ? "text-blue-600"
+                            : order.status === "confirmed"
+                              ? "text-emerald-600"
+                              : "text-amber-600"
                       }`}
                     >
                       {order.status}

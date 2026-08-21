@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, ClipboardList } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
 
@@ -32,9 +32,11 @@ interface Order {
   customer_name: string;
   total: number;
   items: OrderItem[];
-  status: "processing" | "confirmed";
+  status: OrderStatus;
   created_at: string;
 }
+
+type OrderStatus = "processing" | "confirmed" | "shipped" | "delivered";
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -56,16 +58,16 @@ export default function AdminOrdersPage() {
     queueMicrotask(() => void fetchOrders());
   }, [fetchOrders]);
 
-  const confirmOrder = async (orderId: string) => {
+  const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     const { error } = await supabase
       .from("orders")
-      .update({ status: "confirmed" })
+      .update({ status })
       .eq("id", orderId);
 
     if (!error) {
       setOrders((current) =>
         current.map((order) =>
-          order.id === orderId ? { ...order, status: "confirmed" } : order,
+          order.id === orderId ? { ...order, status } : order,
         ),
       );
     }
@@ -118,13 +120,7 @@ export default function AdminOrdersPage() {
                     <p className="text-sm font-extrabold text-blue-600">
                       ₦{Number(order.total).toLocaleString()}
                     </p>
-                    <p
-                      className={`text-[10px] font-bold uppercase mt-1 ${
-                        order.status === "confirmed"
-                          ? "text-emerald-600"
-                          : "text-amber-600"
-                      }`}
-                    >
+                    <p className="text-[10px] font-bold uppercase mt-1 text-emerald-600">
                       {order.status}
                     </p>
                   </div>
@@ -155,15 +151,24 @@ export default function AdminOrdersPage() {
                   ))}
                 </div>
 
-                {order.status === "processing" && (
-                  <button
-                    type="button"
-                    onClick={() => void confirmOrder(order.id)}
-                    className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"
+                <label className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  Order status
+                  <select
+                    value={order.status}
+                    onChange={(event) =>
+                      void updateOrderStatus(
+                        order.id,
+                        event.target.value as OrderStatus,
+                      )
+                    }
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <Check className="w-4 h-4" /> Confirm Order
-                  </button>
-                )}
+                    <option value="processing">Processing</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                  </select>
+                </label>
               </article>
             ))}
           </div>
