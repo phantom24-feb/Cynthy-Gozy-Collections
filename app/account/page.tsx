@@ -30,9 +30,11 @@ export default function AccountContent() {
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [aboutText, setAboutText] = useState("");
+  const [editingAbout, setEditingAbout] = useState(false);
   const [customers, setCustomers] = useState<
-    { id: string; full_name?: string; phone?: string }[]
+    { id: string; full_name?: string; email?: string; phone?: string }[]
   >([]);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [deliveredSales, setDeliveredSales] = useState({
     products: 0,
     revenue: 0,
@@ -82,19 +84,22 @@ export default function AccountContent() {
         setAboutText(about?.content || "Cynthy Gozy Collections brings quality fashion pieces to you.");
 
         if (admin) {
-          const [{ data: customerRows }, { data: deliveredOrders }] =
-            await Promise.all([
-              supabase
-                .from("profiles")
-                .select("id, full_name, phone")
-                .neq("id", user.id)
-                .order("created_at", { ascending: false }),
+          const [
+            { data: customerRows },
+            { data: deliveredOrders },
+            { data: totalUserCount },
+          ] = await Promise.all([
+              supabase.rpc("get_admin_customers", {
+                excluded_user_id: user.id,
+              }),
               supabase
                 .from("orders")
                 .select("total, items, status")
                 .eq("status", "delivered"),
+              supabase.rpc("get_total_users"),
             ]);
           setCustomers(customerRows || []);
+          setTotalUsers(Number(totalUserCount || 0));
           const sales = (deliveredOrders || []).reduce(
             (summary, order) => {
               const items = Array.isArray(order.items) ? order.items : [];
@@ -154,7 +159,13 @@ export default function AccountContent() {
     const { error } = await supabase
       .from("about_us")
       .upsert({ id: 1, content: aboutText.trim() });
-    setAccountMessage(error ? error.message : "About Us updated.");
+    if (error) {
+      setAccountMessage(error.message);
+    } else {
+      setEditingAbout(false);
+      setAccountMessage("About Us updated.");
+      window.setTimeout(() => setAccountMessage(null), 5000);
+    }
     setSaving(false);
   };
 
@@ -287,7 +298,7 @@ export default function AccountContent() {
 
         <section className="mt-6 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 className="text-base font-extrabold text-slate-900">About Us</h2>
-          {isAdmin ? (
+          {isAdmin && editingAbout ? (
             <div className="mt-3 space-y-3">
               <textarea
                 value={aboutText}
@@ -305,9 +316,20 @@ export default function AccountContent() {
               </button>
             </div>
           ) : (
-            <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-600">
-              {aboutText}
-            </p>
+            <>
+              <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-600">
+                {aboutText}
+              </p>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setEditingAbout(true)}
+                  className="mt-3 rounded-xl border border-blue-200 px-4 py-2.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                >
+                  Edit About Us
+                </button>
+              )}
+            </>
           )}
         </section>
 
@@ -317,9 +339,9 @@ export default function AccountContent() {
               <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
                 <Users className="h-5 w-5 text-blue-600" />
                 <p className="mt-3 text-2xl font-extrabold text-slate-900">
-                  {customers.length}
+                  {totalUsers}
                 </p>
-                <p className="text-xs text-slate-500">Registered customers</p>
+                <p className="text-xs text-slate-500">Total registered users</p>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
                 <ShoppingBag className="h-5 w-5 text-emerald-600" />
@@ -338,7 +360,9 @@ export default function AccountContent() {
                 {customers.map((customer) => (
                   <div key={customer.id} className="flex flex-wrap justify-between gap-2 py-3 text-xs">
                     <span className="font-semibold text-slate-800">{customer.full_name || "Customer"}</span>
-                    <span className="text-slate-500">{customer.phone || "No phone number"}</span>
+                    <span className="text-slate-500">
+                      {customer.email || customer.phone || "No contact details"}
+                    </span>
                   </div>
                 ))}
               </div>

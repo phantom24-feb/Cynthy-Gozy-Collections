@@ -12,6 +12,46 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.get_admin_customers(excluded_user_id uuid)
+RETURNS TABLE (
+  id uuid,
+  full_name text,
+  email text,
+  phone text
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+  SELECT
+    users.id,
+    COALESCE(profiles.full_name, users.raw_user_meta_data ->> 'full_name', 'Customer'),
+    users.email,
+    COALESCE(profiles.phone, users.raw_user_meta_data ->> 'phone', '')
+  FROM auth.users users
+  LEFT JOIN public.profiles profiles ON profiles.id = users.id
+  WHERE public.is_admin()
+    AND users.id <> excluded_user_id
+  ORDER BY users.created_at DESC;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_admin_customers(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_admin_customers(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_total_users()
+RETURNS bigint
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+  SELECT count(*)
+  FROM auth.users
+  WHERE public.is_admin();
+$$;
+
+REVOKE ALL ON FUNCTION public.get_total_users() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_total_users() TO authenticated;
+
 DO $$
 DECLARE
   constraint_record record;
