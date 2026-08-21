@@ -31,6 +31,7 @@ interface Product {
 
 const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelries"];
 const GENDERS = ["Male", "Female", "Unisex"];
+const INVENTORY_GENDER_FILTERS = ["Men", "Women"];
 
 function parseVariantValues(value?: string | string[]) {
   if (!value) return [];
@@ -162,6 +163,7 @@ const PRESET_COLORS = [
 export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedGender, setSelectedGender] = useState("All");
   const [inventorySearch, setInventorySearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -216,10 +218,16 @@ export default function AdminPage() {
           : query.eq("category", selectedCategory);
     }
 
+    if (selectedGender === "Men") {
+      query = query.eq("gender", "Male");
+    } else if (selectedGender === "Women") {
+      query = query.eq("gender", "Female");
+    }
+
     const { data } = await query;
     if (data) setProducts(data);
     setLoading(false);
-  }, [selectedCategory, supabase]);
+  }, [selectedCategory, selectedGender, supabase]);
 
   useEffect(() => {
     queueMicrotask(() => void fetchProducts());
@@ -441,6 +449,20 @@ export default function AdminPage() {
               }`}
             >
               {cat}
+            </button>
+          ))}
+          {INVENTORY_GENDER_FILTERS.map((genderFilter) => (
+            <button
+              key={genderFilter}
+              type="button"
+              onClick={() => setSelectedGender(genderFilter)}
+              className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${
+                selectedGender === genderFilter
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              {genderFilter}
             </button>
           ))}
         </div>
