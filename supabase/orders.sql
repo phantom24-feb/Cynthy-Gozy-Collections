@@ -5,7 +5,7 @@ create table if not exists public.orders (
   delivery_address text not null default '',
   total numeric not null default 0,
   items jsonb not null default '[]'::jsonb,
-  status text not null default 'processing' check (status in ('processing', 'confirmed')),
+  status text not null default 'processing' check (status in ('processing', 'confirmed', 'shipped', 'delivered')),
   created_at timestamptz not null default now()
 );
 
@@ -30,12 +30,28 @@ using (
   )
 );
 
-create policy "Admins can confirm orders"
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where profiles.id = auth.uid() and profiles.role = 'admin'
+  );
+$$;
+
+drop policy if exists "Admins can confirm orders" on public.orders;
+drop policy if exists "Admins can update order status" on public.orders;
+
+create policy "Admins can update order status"
 on public.orders for update
 using (
-  exists (
-    select 1 from public.profiles
-    where profiles.id = auth.uid() and profiles.role = 'admin'
-  )
+  public.is_admin()
 )
-with check (status in ('processing', 'confirmed'));
+with check (
+  public.is_admin()
+  and status in ('processing', 'confirmed', 'shipped', 'delivered')
+);

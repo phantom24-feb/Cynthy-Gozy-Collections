@@ -37,6 +37,19 @@ interface Order {
 
 type OrderStatus = "processing" | "confirmed" | "shipped" | "delivered";
 
+const ORDER_STATUSES: OrderStatus[] = [
+  "processing",
+  "confirmed",
+  "shipped",
+  "delivered",
+];
+
+function normalizeOrderStatus(value: string): OrderStatus {
+  return ORDER_STATUSES.includes(value as OrderStatus)
+    ? (value as OrderStatus)
+    : "processing";
+}
+
 interface OrderItem {
   product_id: string;
   name: string;
@@ -155,7 +168,10 @@ export default function CartPage() {
         .select("id, total, status, created_at, items")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      const typedOrders = (orderHistory || []) as Order[];
+      const typedOrders = ((orderHistory || []) as Order[]).map((order) => ({
+        ...order,
+        status: normalizeOrderStatus(order.status),
+      }));
       setOrders(typedOrders);
       setOrderStatus(null);
     }
@@ -475,8 +491,8 @@ export default function CartPage() {
           ) : (
             <div className="space-y-3">
               {orders.map((order) => (
-                <article
-                  key={order.id}
+                <div key={order.id}>
+                  <article
                   role="button"
                   tabIndex={0}
                   onClick={() => setSelectedOrder(order)}
@@ -528,7 +544,24 @@ export default function CartPage() {
                       {order.status}
                     </p>
                   </div>
-                </article>
+                  </article>
+                  <div className="grid grid-cols-4 gap-1 px-1 pt-2">
+                  {ORDER_STATUSES.map((status, index) => (
+                    <div key={status} className="space-y-1 text-center">
+                      <div
+                        className={`h-1.5 rounded-full ${
+                          ORDER_STATUSES.indexOf(order.status) >= index
+                            ? "bg-emerald-500"
+                            : "bg-slate-200"
+                        }`}
+                      />
+                      <span className="block text-[9px] font-semibold capitalize text-slate-500">
+                        {status}
+                      </span>
+                    </div>
+                  ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

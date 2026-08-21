@@ -38,6 +38,19 @@ interface Order {
 
 type OrderStatus = "processing" | "confirmed" | "shipped" | "delivered";
 
+const ORDER_STATUSES: OrderStatus[] = [
+  "processing",
+  "confirmed",
+  "shipped",
+  "delivered",
+];
+
+function normalizeOrderStatus(value: string): OrderStatus {
+  return ORDER_STATUSES.includes(value as OrderStatus)
+    ? (value as OrderStatus)
+    : "processing";
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +63,14 @@ export default function AdminOrdersPage() {
       .select("id, customer_name, total, items, status, created_at")
       .order("created_at", { ascending: false });
 
-    if (data) setOrders(data as Order[]);
+    if (data) {
+      setOrders(
+        (data as Order[]).map((order) => ({
+          ...order,
+          status: normalizeOrderStatus(order.status),
+        })),
+      );
+    }
     setLoading(false);
   }, [supabase]);
 
@@ -70,6 +90,8 @@ export default function AdminOrdersPage() {
           order.id === orderId ? { ...order, status } : order,
         ),
       );
+    } else {
+      window.alert(`Unable to update order status: ${error.message}`);
     }
   };
 
@@ -163,10 +185,11 @@ export default function AdminOrdersPage() {
                     }
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="processing">Processing</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
+                    {ORDER_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </article>
