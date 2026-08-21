@@ -237,14 +237,48 @@ export default function CartPage() {
     message += `Please confirm my order details!`;
 
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = isAndroid
-      ? `intent://send?phone=${whatsappNumber}&text=${encodedMessage}#Intent;package=com.whatsapp;scheme=whatsapp;end`
-      : isIOS
-        ? `whatsapp://send?phone=${whatsappNumber}&text=${encodedMessage}`
-        : `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    const whatsappWebUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
-    // eslint-disable-next-line react-hooks/immutability -- Must navigate synchronously from the click event.
-    window.location.href = whatsappUrl;
+    if (isAndroid) {
+      const businessUrl = `intent://send?phone=${whatsappNumber}&text=${encodedMessage}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;S.browser_fallback_url=${encodeURIComponent(whatsappWebUrl)};end`;
+      const personalUrl = `intent://send?phone=${whatsappNumber}&text=${encodedMessage}#Intent;package=com.whatsapp;scheme=whatsapp;S.browser_fallback_url=${encodeURIComponent(businessUrl)};end`;
+      let whatsappOpened = false;
+
+      const markWhatsAppOpened = () => {
+        whatsappOpened = true;
+      };
+      window.addEventListener("pagehide", markWhatsAppOpened, { once: true });
+
+      // eslint-disable-next-line react-hooks/immutability -- Must navigate synchronously from the click event.
+      window.location.href = personalUrl;
+      window.setTimeout(() => {
+        window.removeEventListener("pagehide", markWhatsAppOpened);
+        if (!whatsappOpened && document.visibilityState === "visible") {
+          window.location.href = businessUrl;
+        }
+      }, 800);
+    } else if (isIOS) {
+      const personalUrl = `whatsapp://send?phone=${whatsappNumber}&text=${encodedMessage}`;
+      const businessUrl = `whatsapp-business://send?phone=${whatsappNumber}&text=${encodedMessage}`;
+      let whatsappOpened = false;
+
+      const markWhatsAppOpened = () => {
+        whatsappOpened = true;
+      };
+      window.addEventListener("pagehide", markWhatsAppOpened, { once: true });
+
+      // eslint-disable-next-line react-hooks/immutability -- Must navigate synchronously from the click event.
+      window.location.href = personalUrl;
+      window.setTimeout(() => {
+        window.removeEventListener("pagehide", markWhatsAppOpened);
+        if (!whatsappOpened && document.visibilityState === "visible") {
+          window.location.href = businessUrl;
+        }
+      }, 800);
+    } else {
+      // eslint-disable-next-line react-hooks/immutability -- Must navigate synchronously from the click event.
+      window.location.href = whatsappWebUrl;
+    }
 
     try {
       const {
