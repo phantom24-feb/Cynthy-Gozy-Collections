@@ -10,6 +10,32 @@ import { useSearchParams } from "next/navigation";
 
 const CATEGORIES = ["All", "Men", "Women", "Clothes", "Shoes", "Jewelries"];
 
+function searchableProductValues(product: Product) {
+  const gender = product.gender?.toLowerCase();
+  const genderSearchAliases =
+    gender === "male"
+      ? "male men"
+      : gender === "female"
+        ? "female women"
+        : gender === "unisex"
+          ? "unisex"
+          : "";
+
+  return [
+    product.name,
+    product.description,
+    product.category,
+    product.gender,
+    genderSearchAliases,
+    product.sizes,
+    product.colors,
+  ]
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+}
+
 function ProductCarouselRow({
   products,
   onSelect,
@@ -115,13 +141,16 @@ export default function HomePage() {
         query = query.eq("category", selectedCategory);
       }
 
-      if (searchQuery) {
-        query = query.ilike("name", `%${searchQuery}%`);
-      }
-
       const { data, error } = await query;
       if (!error && data) {
-        setProducts(data);
+        const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+        setProducts(
+          normalizedSearchQuery
+            ? data.filter((product) =>
+                searchableProductValues(product).includes(normalizedSearchQuery),
+              )
+            : data,
+        );
       }
       setLoading(false);
     };
