@@ -54,9 +54,16 @@ export default function AccountContent() {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      let user: Awaited<
+        ReturnType<typeof supabase.auth.getUser>
+      >["data"]["user"];
+      try {
+        const result = await supabase.auth.getUser();
+        user = result.data.user;
+      } catch {
+        setLoading(false);
+        return;
+      }
       if (user) {
         const { data } = await supabase
           .from("profiles")
@@ -81,7 +88,10 @@ export default function AccountContent() {
           .select("content")
           .eq("id", 1)
           .maybeSingle();
-        setAboutText(about?.content || "Cynthy Gozy Collections brings quality fashion pieces to you.");
+        setAboutText(
+          about?.content ||
+            "Cynthy Gozy Collections brings quality fashion pieces to you.",
+        );
 
         if (admin) {
           const [
@@ -89,15 +99,15 @@ export default function AccountContent() {
             { data: deliveredOrders },
             { data: totalUserCount },
           ] = await Promise.all([
-              supabase.rpc("get_admin_customers", {
-                excluded_user_id: user.id,
-              }),
-              supabase
-                .from("orders")
-                .select("total, items, status")
-                .eq("status", "delivered"),
-              supabase.rpc("get_total_users"),
-            ]);
+            supabase.rpc("get_admin_customers", {
+              excluded_user_id: user.id,
+            }),
+            supabase
+              .from("orders")
+              .select("total, items, status")
+              .eq("status", "delivered"),
+            supabase.rpc("get_total_users"),
+          ]);
           setCustomers(customerRows || []);
           setTotalUsers(Number(totalUserCount || 0));
           const sales = (deliveredOrders || []).reduce(
@@ -129,8 +139,15 @@ export default function AccountContent() {
     setAccountMessage(null);
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (userError || !user) {
+      setAccountMessage(
+        "Your session could not be verified. Please sign in again.",
+      );
+      setSaving(false);
+      return;
+    }
 
     const { error: profileError } = await supabase
       .from("profiles")
@@ -141,11 +158,20 @@ export default function AccountContent() {
       data: { full_name: editName.trim(), phone: editPhone.trim() },
     });
     if (profileError || authError) {
-      setAccountMessage(profileError?.message || authError?.message || "Unable to update account.");
+      setAccountMessage(
+        profileError?.message ||
+          authError?.message ||
+          "Unable to update account.",
+      );
     } else {
       setProfile((current) =>
         current
-          ? { ...current, full_name: editName.trim(), email: editEmail.trim(), phone: editPhone.trim() }
+          ? {
+              ...current,
+              full_name: editName.trim(),
+              email: editEmail.trim(),
+              phone: editPhone.trim(),
+            }
           : current,
       );
       setEditing(false);
@@ -170,7 +196,11 @@ export default function AccountContent() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Continue to the public homepage even if the session is already gone.
+    }
     router.push("/");
     router.refresh();
   };
@@ -348,18 +378,27 @@ export default function AccountContent() {
                 <p className="mt-3 text-2xl font-extrabold text-slate-900">
                   {deliveredSales.products}
                 </p>
-                <p className="text-xs text-slate-500">Products sold and delivered</p>
+                <p className="text-xs text-slate-500">
+                  Products sold and delivered
+                </p>
                 <p className="mt-1 text-xs font-bold text-emerald-600">
                   ₦{deliveredSales.revenue.toLocaleString()} delivered revenue
                 </p>
               </div>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-              <h2 className="text-base font-extrabold text-slate-900">Customers</h2>
+              <h2 className="text-base font-extrabold text-slate-900">
+                Customers
+              </h2>
               <div className="mt-3 divide-y divide-slate-100">
                 {customers.map((customer) => (
-                  <div key={customer.id} className="flex flex-wrap justify-between gap-2 py-3 text-xs">
-                    <span className="font-semibold text-slate-800">{customer.full_name || "Customer"}</span>
+                  <div
+                    key={customer.id}
+                    className="flex flex-wrap justify-between gap-2 py-3 text-xs"
+                  >
+                    <span className="font-semibold text-slate-800">
+                      {customer.full_name || "Customer"}
+                    </span>
                     <span className="text-slate-500">
                       {customer.email || customer.phone || "No contact details"}
                     </span>

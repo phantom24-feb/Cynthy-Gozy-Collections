@@ -89,9 +89,14 @@ export default function CartPage() {
 
   const fetchCart = useCallback(async () => {
     setLoading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"];
+    try {
+      const result = await supabase.auth.getUser();
+      user = result.data.user;
+    } catch {
+      setLoading(false);
+      return;
+    }
 
     if (user) {
       setUserName(user.user_metadata?.full_name || user.email || "Customer");
@@ -285,8 +290,7 @@ export default function CartPage() {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) {
+      if (userError || !user) {
         router.push("/login?redirectTo=/cart");
         return;
       }

@@ -130,10 +130,14 @@ export default function HomePage() {
 
   useEffect(() => {
     const checkAuthentication = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setIsAuthenticated(Boolean(user));
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setIsAuthenticated(Boolean(user));
+      } catch {
+        setIsAuthenticated(false);
+      }
     };
 
     checkAuthentication();

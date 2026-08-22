@@ -24,27 +24,32 @@ export default function Navbar({
     startTransition(() => setSearchQuery(currentQuery));
 
     const checkUserAndCart = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (user) {
-        const [{ data: profile }, { data: cartItems }] = await Promise.all([
-          supabase.from("profiles").select("role").eq("id", user.id).single(),
-          supabase.from("cart_items").select("quantity").eq("user_id", user.id),
-        ]);
+        if (user) {
+          const [{ data: profile }, { data: cartItems }] = await Promise.all([
+            supabase.from("profiles").select("role").eq("id", user.id).single(),
+            supabase.from("cart_items").select("quantity").eq("user_id", user.id),
+          ]);
 
-        if (profile?.role === "admin") {
-          setIsAdmin(true);
+          setIsAdmin(profile?.role === "admin");
+          if (cartItems) {
+            const totalCount = cartItems.reduce(
+              (acc, item) => acc + item.quantity,
+              0,
+            );
+            setCartCount(totalCount);
+          }
+        } else {
+          setIsAdmin(false);
+          setCartCount(0);
         }
-
-        if (cartItems) {
-          const totalCount = cartItems.reduce(
-            (acc, item) => acc + item.quantity,
-            0,
-          );
-          setCartCount(totalCount);
-        }
+      } catch {
+        setIsAdmin(false);
+        setCartCount(0);
       }
     };
 

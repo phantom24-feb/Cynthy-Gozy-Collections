@@ -31,7 +31,7 @@ interface Product {
 
 const CATEGORIES = ["All", "Clothes", "Shoes", "Jewelries"];
 const GENDERS = ["Male", "Female", "Unisex"];
-const INVENTORY_GENDER_FILTERS = ["Men", "Women"];
+const INVENTORY_FILTERS = [...CATEGORIES, "Men", "Women", "Unisex"];
 
 function parseVariantValues(value?: string | string[]) {
   if (!value) return [];
@@ -162,8 +162,7 @@ const PRESET_COLORS = [
 
 export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedGender, setSelectedGender] = useState("All");
+  const [selectedInventoryFilter, setSelectedInventoryFilter] = useState("All");
   const [inventorySearch, setInventorySearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -211,23 +210,20 @@ export default function AdminPage() {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (selectedCategory !== "All") {
-      query =
-        selectedCategory === "Jewelries"
-          ? query.eq("category", "Jewelries")
-          : query.eq("category", selectedCategory);
-    }
-
-    if (selectedGender === "Men") {
+    if (selectedInventoryFilter === "Men") {
       query = query.eq("gender", "Male");
-    } else if (selectedGender === "Women") {
+    } else if (selectedInventoryFilter === "Women") {
       query = query.eq("gender", "Female");
+    } else if (selectedInventoryFilter === "Unisex") {
+      query = query.eq("gender", "Unisex");
+    } else if (selectedInventoryFilter !== "All") {
+      query = query.eq("category", selectedInventoryFilter);
     }
 
     const { data } = await query;
     if (data) setProducts(data);
     setLoading(false);
-  }, [selectedCategory, selectedGender, supabase]);
+  }, [selectedInventoryFilter, supabase]);
 
   useEffect(() => {
     queueMicrotask(() => void fetchProducts());
@@ -328,7 +324,10 @@ export default function AdminPage() {
       };
 
       const result = editingProduct
-        ? await supabase.from("products").update(payload).eq("id", editingProduct.id)
+        ? await supabase
+            .from("products")
+            .update(payload)
+            .eq("id", editingProduct.id)
         : await supabase.from("products").insert([payload]);
 
       if (result.error) throw new Error(result.error.message);
@@ -437,32 +436,18 @@ export default function AdminPage() {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
-          {CATEGORIES.map((cat) => (
+          {INVENTORY_FILTERS.map((inventoryFilter) => (
             <button
-              key={cat}
+              key={inventoryFilter}
               type="button"
-              onClick={() => setSelectedCategory(cat)}
+              onClick={() => setSelectedInventoryFilter(inventoryFilter)}
               className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${
-                selectedCategory === cat
+                selectedInventoryFilter === inventoryFilter
                   ? "bg-slate-900 text-white"
                   : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
               }`}
             >
-              {cat}
-            </button>
-          ))}
-          {INVENTORY_GENDER_FILTERS.map((genderFilter) => (
-            <button
-              key={genderFilter}
-              type="button"
-              onClick={() => setSelectedGender(genderFilter)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${
-                selectedGender === genderFilter
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-              }`}
-            >
-              {genderFilter}
+              {inventoryFilter}
             </button>
           ))}
         </div>
@@ -502,62 +487,62 @@ export default function AdminPage() {
               <div key={product.id} className="relative min-w-0">
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <div className="relative h-48 bg-slate-100">
-                  {(() => {
-                    const imageUrl =
-                      parseImageValues(product.image_url)[0] ||
-                      (typeof product.image_url === "string"
-                        ? product.image_url
-                        : "");
-                    return imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt={product.name}
-                        className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                        No image
-                      </div>
-                    );
-                  })()}
-                  <span className="absolute top-2 left-2 bg-slate-900/75 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-                    {product.category}
-                  </span>
-                </div>
+                    {(() => {
+                      const imageUrl =
+                        parseImageValues(product.image_url)[0] ||
+                        (typeof product.image_url === "string"
+                          ? product.image_url
+                          : "");
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={product.name}
+                          className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                          No image
+                        </div>
+                      );
+                    })()}
+                    <span className="absolute top-2 left-2 bg-slate-900/75 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+                      {product.category}
+                    </span>
+                  </div>
 
-                <div className="p-3 space-y-2">
-                  <div>
-                    <h3 className="text-xs font-extrabold text-slate-900 truncate">
-                      {product.name}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      ₦{Number(product.price).toLocaleString()}
+                  <div className="p-3 space-y-2">
+                    <div>
+                      <h3 className="text-xs font-extrabold text-slate-900 truncate">
+                        {product.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        ₦{Number(product.price).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 line-clamp-2">
+                      {product.description}
                     </p>
-                  </div>
 
-                  <p className="text-[11px] text-slate-600 line-clamp-2">
-                    {product.description}
-                  </p>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(product)}
-                      className="min-w-0 flex-1 inline-flex items-center justify-center gap-1 bg-blue-50 text-blue-700 border border-blue-100 px-2 py-2 rounded-xl text-[11px] font-bold"
-                    >
-                      <Edit2 className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProduct(product.id)}
-                      className="min-w-0 flex-1 inline-flex items-center justify-center gap-1 bg-red-50 text-red-600 border border-red-100 px-2 py-2 rounded-xl text-[11px] font-bold"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Delete</span>
-                    </button>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(product)}
+                        className="min-w-0 flex-1 inline-flex items-center justify-center gap-1 bg-blue-50 text-blue-700 border border-blue-100 px-2 py-2 rounded-xl text-[11px] font-bold"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="min-w-0 flex-1 inline-flex items-center justify-center gap-1 bg-red-50 text-red-600 border border-red-100 px-2 py-2 rounded-xl text-[11px] font-bold"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Delete</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
                 </div>
                 <button
                   type="button"
@@ -578,7 +563,9 @@ export default function AdminPage() {
                       onClick={() => void toggleTrending(product)}
                       className="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold text-white hover:bg-slate-700 focus-visible:bg-slate-700"
                     >
-                      {product.trending ? "Remove from Trending" : "Add to Trending"}
+                      {product.trending
+                        ? "Remove from Trending"
+                        : "Add to Trending"}
                     </button>
                   </div>
                 )}

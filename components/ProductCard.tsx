@@ -168,11 +168,7 @@ export default function ProductCard({
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError && userError.name !== "AuthSessionMissingError") {
-        throw userError;
-      }
-
-      if (!user) {
+      if (userError || !user) {
         router.push("/signup?redirectTo=/");
         return;
       }
