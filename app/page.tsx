@@ -6,7 +6,7 @@ import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/components/ProductCard";
 import { createClient } from "@/lib/supabase/client";
 import { Sparkles, Flame } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const CATEGORIES = ["All", "Men", "Women", "Clothes", "Shoes", "Jewelries"];
 
@@ -121,10 +121,33 @@ export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("search") || "";
+
+  useEffect(() => {
+    const checkAuthentication = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setIsAuthenticated(Boolean(user));
+    };
+
+    checkAuthentication();
+  }, [supabase]);
+
+  const requireAuthentication = () => {
+    if (isAuthenticated) return true;
+    router.push("/signup?redirectTo=/");
+    return false;
+  };
+
+  const handleProductSelect = (product: Product) => {
+    if (requireAuthentication()) setSelectedProduct(product);
+  };
   useEffect(() => {
     let isCurrentRequest = true;
 
@@ -192,6 +215,12 @@ export default function HomePage() {
         </div>
       </div>
 
+      {isAuthenticated === false && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center text-xs font-semibold text-amber-900">
+          Sign up to browse goods.
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 flex-1 w-full space-y-8">
         {/* Trending / Hot Products Section */}
         {!loading &&
@@ -216,7 +245,7 @@ export default function HomePage() {
 
               <ProductCarouselRow
                 products={trendingProducts}
-                onSelect={setSelectedProduct}
+                onSelect={handleProductSelect}
                 hideLastOnMobile
               />
             </section>
@@ -234,7 +263,9 @@ export default function HomePage() {
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => {
+                  if (requireAuthentication()) setSelectedCategory(cat);
+                }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                   selectedCategory === cat
                     ? "bg-blue-600 text-white shadow-sm"
@@ -270,7 +301,7 @@ export default function HomePage() {
                 <ProductCarouselRow
                   key={`product-row-${index}`}
                   products={row}
-                  onSelect={setSelectedProduct}
+                  onSelect={handleProductSelect}
                 />
               ))}
             </div>

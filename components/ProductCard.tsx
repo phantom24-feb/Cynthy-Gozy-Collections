@@ -171,7 +171,7 @@ export default function ProductCard({
       if (userError) throw userError;
 
       if (!user) {
-        router.push("/login?redirectTo=/");
+        router.push("/signup?redirectTo=/");
         return;
       }
 
