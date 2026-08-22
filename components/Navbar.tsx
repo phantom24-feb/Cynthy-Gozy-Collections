@@ -56,16 +56,24 @@ export default function Navbar({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/?search=${encodeURIComponent(searchQuery.trim())}`);
+    updateSearch(searchQuery);
+  };
+
+  const updateSearch = (value: string) => {
+    setSearchQuery(value);
+    const trimmedQuery = value.trim();
+
+    if (trimmedQuery) {
+      router.replace(`/?search=${encodeURIComponent(trimmedQuery)}`, {
+        scroll: false,
+      });
     } else {
-      router.push("/");
+      router.replace("/", { scroll: false });
     }
   };
 
   const clearSearch = () => {
-    setSearchQuery("");
-    router.push("/");
+    updateSearch("");
   };
 
   return (
@@ -89,7 +97,7 @@ export default function Navbar({
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => updateSearch(e.target.value)}
                   placeholder="Search items..."
                   className="w-full pl-9 pr-8 py-1.5 sm:py-2 text-xs text-slate-900 bg-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 transition"
                 />

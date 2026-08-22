@@ -126,6 +126,8 @@ export default function HomePage() {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("search") || "";
   useEffect(() => {
+    let isCurrentRequest = true;
+
     const fetchProducts = async () => {
       setLoading(true);
       let query = supabase
@@ -142,7 +144,7 @@ export default function HomePage() {
       }
 
       const { data, error } = await query;
-      if (!error && data) {
+      if (isCurrentRequest && !error && data) {
         const normalizedSearchQuery = searchQuery.trim().toLowerCase();
         setProducts(
           normalizedSearchQuery
@@ -152,10 +154,14 @@ export default function HomePage() {
             : data,
         );
       }
-      setLoading(false);
+      if (isCurrentRequest) setLoading(false);
     };
 
     fetchProducts();
+
+    return () => {
+      isCurrentRequest = false;
+    };
   }, [selectedCategory, searchQuery, supabase]);
 
   const trendingProducts = products
